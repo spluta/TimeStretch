@@ -36,7 +36,7 @@ f.loadCentroid
 f.getMFCCChannel(0)
 f.getMFCCChannel(1)
 
-f.getMFCCChannelParallel(1, 88200, 5)
+//f.getMFCCChannelParallel(1, 88200, 5)
 
 //the mfcc analysis only needs to happen once. after, the files can be loaded with loadFileDataSets
 f.loadFileDataSets
@@ -55,16 +55,23 @@ f.loadFrameDataSets
 f.createClusters
 
 
-f.saveClusterData //it would be good to save these for future use
+f.saveClusterData //save these for future use
 f.loadClusterData //and next time we can load them
 
 //PLAYBACK
 //now that the data has all been saved, we can load an run this at any point
 //run each line independently
-f = FluidNMFStretch(s, "/Volumes/Samsung_T5/AdagiettoShort/AdagiettoShort.wav")
+s.reboot
+f = FluidNMFStretch(s, "/Volumes/Samsung_T5/AdaggietoSweden/AdagiettoHardingSweden.wav")
 f.loadClusterData;
 f.setStretchFolder("VariStretchDispAlg2C"); //choose the correct Stretch folder inside the Main folder (there can be multiple)
 f.makePanner;
-f.playAtSlice(15);
+f.playAtSlice(50);
+
+//todo!!!
+deal with panning
+--isolating groups
+--moving pan points
+
 
 
