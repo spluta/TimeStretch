@@ -371,7 +371,7 @@ FluidNMFStretch {
 									labelNum = i.asString;
 									(4-labelNum.size).do{labelNum=labelNum.insert(0, "0")};
 
-									labelNum.postln;
+									//labelNum.postln;
 									frameClusters.getLabel(labelNum, {|val|
 										groups[val.asSymbol].add(labelNum)
 									});
@@ -463,7 +463,8 @@ FluidNMFStretch {
 					doit.value(files[counter], counter)
 				}
 				{
-					"shaping to time sets".postln; oscy.free;
+					//"shaping to time sets".postln;
+					oscy.free;
 
 					//save and set
 					this.saveFileDataSets(chanNum);

@@ -1,8 +1,12 @@
+s.reboot
+
 //create an instance of FluidNMFStretch
 //probably best to reboot the server before loading
 f = FluidNMFStretch(s, "/Volumes/Samsung_T5/Mahler5Chailly/Mahler.wav")
 f = FluidNMFStretch(s, "/Volumes/Samsung_T5/AdagiettoShort/AdagiettoShort.wav")
-f = FluidNMFStretch(s, "/Volumes/Samsung_T5/Adaggietto_441_24/Adagietto_441_24.wav", 50)
+f = FluidNMFStretch(s, "/Volumes/Samsung_T5/AdaggietoSweden/AdagiettoHardingSweden.wav")
+
+f = FluidNMFStretch(s, "/Volumes/Samsung_T5/Mahler3OhMench/Mahler3.wav")
 
 //makes the necessary subfolders to hold the NMF Channels and the MFCC Channels
 f.makeFolders;
@@ -25,8 +29,15 @@ f.loadCentroid
 //the panning algorithm of FluidNMFStretch relies upon an MFCC analysis of the NMF channels, grouping the channels into clumps
 
 //get MFCC does the MFCC analysis on each NMF channel, saving the analysis to the ChanNFile folders inside the mfcc folder
+//at this point, these need to happen one channel at a time
+//it will say "Buffer UGen: no buffer data". THIS IS A LIE!
 //it will say "Processing Cancelled" but that just means it is done
-f.getMFCC
+
+f.getMFCCChannel(0)
+f.getMFCCChannel(1)
+
+f.getMFCCChannelParallel(1, 88200, 5)
+
 //the mfcc analysis only needs to happen once. after, the files can be loaded with loadFileDataSets
 f.loadFileDataSets
 
@@ -40,17 +51,19 @@ f.saveFrameDataSetsFromFileChannel(1)
 
 //on each frame, the algorithm clusters the N time-stretched NMF channels into timbrel similarity
 //to do this, we must create clusters
+f.loadFrameDataSets
 f.createClusters
+
+
 f.saveClusterData //it would be good to save these for future use
 f.loadClusterData //and next time we can load them
-
 
 //PLAYBACK
 //now that the data has all been saved, we can load an run this at any point
 //run each line independently
 f = FluidNMFStretch(s, "/Volumes/Samsung_T5/AdagiettoShort/AdagiettoShort.wav")
 f.loadClusterData;
-f.setStretchFolder("VariStretchDispAlg2C");
+f.setStretchFolder("VariStretchDispAlg2C"); //choose the correct Stretch folder inside the Main folder (there can be multiple)
 f.makePanner;
 f.playAtSlice(15);
 
