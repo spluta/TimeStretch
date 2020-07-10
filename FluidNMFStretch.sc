@@ -212,7 +212,7 @@ FluidNMFStretch {
 		}
 	}
 
-	variWindowStretch {|durMult=12, stretchFolderIn="Stretch", maxDispersion=0, variAlgorithm=1, splitPoints|
+	variWindowStretch {|durMult=12, stretchFolderIn="Stretch", maxDispersion=0, variAlgorithm=1, splitPoints, channels|
 		var inFiles, x, chanFolders, folder, tupletDict, fftSize;
 		if(splitPoints==nil){splitPoints = [700,1200, 1700,2400,3500]};
 
@@ -225,6 +225,9 @@ FluidNMFStretch {
 				};
 
 				chanFolders = PathName(chanFolder).folders;
+
+				if(channels!=nil){chanFolders = chanFolders.select{|chan, i| channels.indexOf(i)!=nil}};
+				chanFolders.postln;
 
 				chanFolders.do{|folder, chanNum|
 					var inFiles;
@@ -266,8 +269,8 @@ FluidNMFStretch {
 							2, {
 								switch(temp,
 									0, {fftSize = 8192*2; frameTuplet = 2},
-									1, {fftSize = 8192; frameTuplet = 2},
-									2, {fftSize = 8192; frameTuplet = [2,5].choose},
+									1, {fftSize = 8192*2; frameTuplet = [2,5].choose},
+									2, {fftSize = 8192; frameTuplet = [2,3].choose},
 									3, {fftSize = 8192; frameTuplet = [2,5].choose},
 									4, {fftSize = 4096; frameTuplet = 2; disp = maxDispersion/2},
 									5, {fftSize = 4096; frameTuplet = 2; disp = maxDispersion/2}

@@ -6,13 +6,14 @@ NRT_Server_ID {
 }
 
 TimeStretch {
-	classvar synth;
+	classvar synths;
 	//by Sam Pluta - sampluta.com
 	// Based on the Jean-Philippe Drecourt's port of Paul's Extreme Sound Stretch algorithm by Nasca Octavian PAUL
 	// https://github.com/paulnasca/paulstretch_python/blob/master/paulstretch_steps.png
 	//http://drecourt.com
 
 	*initClass {
+		synths = List.newClear(0);
 		StartUp.add {
 
 			SynthDef(\pb_monoStretch2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, amp = 1, gate = 1|
@@ -33,7 +34,7 @@ TimeStretch {
 					chain = PV_Diffuser(chain, 1-trig);
 					item = IFFT(chain, wintype: -1);
 				});
-				env = EnvGen.ar(Env.linen(trigPeriod/2, 0, trigPeriod/2, 1, 'wel'), trig)**1.25;
+				env = EnvGen.ar(Env.linen(trigPeriod/2, 0, trigPeriod/2, 1, 'wel'), trig)/***1.25*/;
 				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate);
 				sig = sig*env*bigEnv;
 				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);
@@ -62,7 +63,7 @@ TimeStretch {
 					chain = PV_Diffuser(chain, 1-trig);
 					item = IFFT(chain, wintype: -1);
 				});
-				env = EnvGen.ar(Env.linen(trigPeriod/2, 0, trigPeriod/2, 1, 'wel'), trig)**1.25;
+				env = EnvGen.ar(Env.linen(trigPeriod/2, 0, trigPeriod/2, 1, 'wel'), trig);
 				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate);
 				sig = sig*env*bigEnv;
 				sig[1] = DelayC.ar(sig[1], 2*trigPeriod/3, trigPeriod/3);
@@ -93,7 +94,7 @@ TimeStretch {
 					item = IFFT(chain, wintype: -1);
 				});
 				trigDiv = PulseDivider.ar(trig, 2);
-				env = EnvGen.ar(Env.linen(trigPeriod/2, 0, trigPeriod/2, 1, 'wel'), trig)**1.25;
+				env = EnvGen.ar(Env.linen(trigPeriod/2, 0, trigPeriod/2, 1, 'wel'), trig);
 				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate);
 				sig = sig*env*bigEnv;
 				sig[1] = DelayC.ar(sig[1], 2*trigPeriod/5, 2*trigPeriod/5);
@@ -120,8 +121,6 @@ TimeStretch {
 				.numInputBusChannels_(1)
 			);
 
-			durMult = 12;
-
 			buffer = Buffer.new(server, 0, 1);
 
 			sf = SoundFile.openRead(inFile.fullPath);
@@ -147,13 +146,14 @@ TimeStretch {
 		}
 	}
 
-	*stretch { |target, outBus=0, bufferChan, pan=(-1), durMult=10, startPos = 0, fftSize = 8192, frameTuplet = 2, timeOffset=0|
+	*stretch { |target, bufferChan, outBus=0, pan=(-1), durMult=10, startPos = 0, fftSize = 8192, frameTuplet = 2, timeOffset=0|
 
-		if(synth!=nil){synth.set(\gate, 0)};
-		synth = Synth("pb_monoStretch"++frameTuplet, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \startPos, startPos, \fftSize, fftSize, \amp, 1, \gate, 1]);
+		//if(synth!=nil){synth.set(\gate, 0)};
+		synths.add(Synth.new("pb_monoStretch"++frameTuplet, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \startPos, startPos, \fftSize, fftSize, \amp, 1, \gate, 1], target));
 	}
 
-		*stop {
-			if(synth!=nil){synth.set(\gate, 0)};
-		}
+	*stop {
+		synths.do{|synth| if(synth!=nil){synth.set(\gate, 0)}};
+		synths = List.newClear(0);
+	}
 }
