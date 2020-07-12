@@ -79,41 +79,42 @@ FluidNMFStretch {
 		//
 
 		numChannels.do{|bufI|
-			var bufChan, resynth;
+			var bufChan, resynth, bufChan2;
 			"Chan ".post; bufI.postln;
 			//this.makeFolders;
 			resynth = Buffer.new(server);
+			bufChan2 = Buffer.new(server);
 			bufChan = Buffer.readChannel(server,fileIn, channels:[bufI],
 				action:{|bufChan|
 					[bufI,bufChan].postln;
-					FluidBufNMF.process(server, bufChan, resynth:resynth, components: components, iterations:500, windowSize:2048,
-						action:{|buf|
-							buf.postln;
-							buf.write(writeDir++PathName(fileIn).fileNameWithoutExtension++"_Chan"++bufI++"_"++components++".caf", "caf", "int24");
-							//extractChannels.value(buf, bufI);
+					FluidBufCompose.process(server, bufChan, 0, -1, 0, -1, 1, bufChan2, 44100, 0, 0, {|bufChan2|
+						FluidBufNMF.process(server, bufChan2, resynth:resynth, components: components, iterations:500, windowSize:2048,
+							action:{|buf|
+								buf.postln;
+								//buf.write(writeDir++PathName(fileIn).fileNameWithoutExtension++"_Chan"++bufI++"_"++components++".caf", "caf", "int24");
+								//extractChannels.value(buf, bufI);
 
-							buf.numChannels.do{|i|
-								var local;
-								local = Buffer.new(server);
-								FluidBufCompose.process(server, buf, 0, -1, i, 1, destination:local, action:{arg singleBuf;
-									var path,labelNum, bufName, mfccBuf, folder;
-									labelNum = i.asString;
-									(4-labelNum.size.postln).do{labelNum=labelNum.insert(0, "0")};
-									bufName = PathName(fileIn).fileNameWithoutExtension++"_Chan"++bufI++"_"++labelNum;
-									path = writeDir++"Chans/Chan"++bufI++"/"++bufName++".wav";
+								buf.numChannels.do{|i|
+									var local;
+									local = Buffer.new(server);
+									FluidBufCompose.process(server, buf, 0, -1, i, 1, destination:local, action:{arg singleBuf;
+										var path,labelNum, bufName, mfccBuf, folder;
+										labelNum = i.asString;
+										(4-labelNum.size.postln).do{labelNum=labelNum.insert(0, "0")};
+										bufName = PathName(fileIn).fileNameWithoutExtension++"_Chan"++bufI++"_"++labelNum;
+										path = writeDir++"Chans/Chan"++bufI++"/"++bufName++".wav";
 
-									singleBuf.write(path);
+										singleBuf.write(path);
 
-									counter = counter+1;
-									counter.postln;
-									if(counter==(numChannels*components)){
-
-										"all NMFed".postln;
-										action.value;
-
-									}
-								})
-							};
+										counter = counter+1;
+										counter.postln;
+										if(counter==(numChannels*components)){
+											"all NMFed".postln;
+											action.value;
+										}
+									})
+								};
+						})
 					})
 			});
 		};
@@ -121,7 +122,7 @@ FluidNMFStretch {
 		//}.fork
 	}
 
-	stretch {|durMult=12, stretchFolderIn="Stretch", fftSize=8192, maxDispersion=0|
+	stretch {|durMult=12, stretchFolderIn="Stretch", fftMax=65536, maxDispersion=0|
 		var inFiles, x, chanFolders, folder;
 		//[folderOrFile, durMult, stretchFolder].postln;
 		{
@@ -142,7 +143,7 @@ FluidNMFStretch {
 				inFiles.do{|inFile,i|
 					var outFile;
 					outFile = stretchFolder++folder.folderName++"/"++(inFile.fileName);
-					TimeStretch.stretchNRT(inFile, outFile, durMult, fftSize, 2, rrand(0,maxDispersion));
+					TimeStretch.stretchNRT(inFile.fullPath, outFile, durMult, fftMax, 2, rrand(0,maxDispersion));
 				}
 			}
 	}.fork}
@@ -280,7 +281,7 @@ FluidNMFStretch {
 						);
 						[centroid, temp, fftSize, frameTuplet].postln;
 						outFile = stretchFolder++folder.folderName++"/"++(inFile.fileName);
-						TimeStretch.stretchNRT(inFile, outFile, durMult, fftSize, frameTuplet, rrand(0,disp));
+						TimeStretch.stretchNRT(inFile.fullPath, outFile, durMult, fftSize, frameTuplet, rrand(0,disp));
 					}
 				}
 		}.fork}
