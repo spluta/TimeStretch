@@ -96,11 +96,12 @@ The amplitude. Default is 1.
 
 Examples::
 
-Will start an NRT server, load the file, and execute the time stretch. The new sound file will go into the default recordings directory in SC:
+Will start an NRT server, load the file, and execute the time stretch. Each instance of this will run on its own server, so you can run as many simultaneously as your computer can handle.
 
 code::
 t = TimeStretch;
 
+//The new sound file will go into the default recordings directory in SC
 t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 10);
 ::
 
