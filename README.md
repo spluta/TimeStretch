@@ -1,12 +1,20 @@
-# TimeStretchTools
+# TimeStretch
 
-Dependecies: FluCoMa Plugins for SuperCollider: www.flucoma.org
+by
+Alex Ness
+and
+Sam Pluta - sampluta.com
 
-This program is designed to take an N channel sound file, split the file into ) componenents, time stretch the ) components, and play back the components over P speakers.
+Implements a phase bashed FFT (SC) or STFT (python) time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
+0-86hz : 65536
+86-172hz : 32768
+172-344 : 16384
+344-689 : 8192
+689-1378 : 4096
+1378-2756 : 2048
+2756 - 5512 : 1024
+5512-11025 : 512
+11025-22050 : 256
 
-by Sam Pluta - sampluta.com
-
-The time stretching algorithm used is based on Jean-Philippe Drecourt's port of Paul's Extreme Sound Stretch algorithm by Nasca Octavian PAUL
-https://github.com/paulnasca/paulstretch_python/blob/master/paulstretch_steps.png
-http://drecourt.com
+Python3 and SuperCollider implementations provided.

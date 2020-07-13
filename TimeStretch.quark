@@ -1,0 +1,8 @@
+(
+  name: "TimeStretch",
+  summary: "An extreme time stretch plugin, based on the Ness Stretch layered STFT algorithm.",
+  version: "1.0.0",
+  schelp: "TimeStretch",
+  license: "GPL",
+  copyright: "Sam Pluta and Alex Ness, 2020"
+)

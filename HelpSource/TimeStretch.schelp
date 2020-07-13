@@ -1,0 +1,124 @@
+class:: TimeStretch
+summary:: Time Stretch
+related:: FFT, IFFT, PV_Diffuser, PV_BrickWall
+categories::  UGens>FFT
+
+Description::
+Implements a phase bashed FFT time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
+
+0-86hz : 65536
+
+86-172hz : 32768
+
+172-344 : 16384
+
+344-689 : 8192
+
+689-1378 : 4096
+
+1378-2756 : 2048
+
+2756 - 5512 : 1024
+
+5512-11025 : 512
+
+11025-22050 : 256
+
+
+
+classmethods::
+
+method::stretchNRT
+
+argument::inFile
+
+Path to the input file to be stretch. Can be a mono or stereo file.
+
+argument::outFile
+
+Path to the destination output file. Will output a mono or stereo file corresponding to the input. Will output a WAV file up to 4gb and a CAF if larger.
+
+argument::durMult
+
+	How many times longer the outFile will be than the inFile. Goes waaaaay past 11 (try 100!).
+
+argument::fftMax
+
+The largest FFT buffer size, for the lowest frequency data.
+
+argument::overlaps
+
+The default is 4, but 2 is also an option. 2 can be shakey. 4 can be smeary. Life is a mess. Pick your poison.
+
+argument::numSplits
+
+	By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below 22050, then subsequent octaves down from there, leaving everything below 86hz to the largest buffer. However, some material, like classical orchestral music, gets swimmy above a certain register (or the swimminess that is welcome in pop becomes unwelcome). Here you can set the split to 8 or lower. Setting the number to 7, for instance, leaves us with a top FFT dealing with the frequency range above 2756 with a bin size of 1024 rather the audio range above 11025 with a bin size of 256, which is the default.
+
+	Simple answer: if it is swimmy, try a 8 or lower here. For string music, for instance, I found 4 to be best. A number above 9 will do nothing.
+
+argument::amp
+
+The amplitude. Default is 1.
+
+method::stretchRT
+
+argument::target
+
+A group or server
+
+argument::bufferChan
+
+A mono buffer to stretch
+
+argument::outBus
+
+The outbus.
+
+argument::pan
+
+-1 to 1
+
+argument::durMult
+
+The multiple of the stretch.
+
+argument::overlaps
+
+The default is 4, but 2 is also an option. 2 can be shakey. 4 can be smeary.
+
+argument::startPos
+
+startPos in the file, from 0 to 1.
+
+argument::amp
+
+The amplitude. Default is 1.
+
+Examples::
+
+Will start an NRT server, load the file, and execute the time stretch. The new sound file will go into the default recordings directory in SC:
+
+code::
+t = TimeStretch;
+
+t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 10);
+::
+
+Using the numSplits argument:
+
+code::
+	t = TimeStretch;
+	t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 10, numSplits:4);
+::
+
+A real-time version (which is basically a PaulStretch algorithm):
+
+code::
+	s.boot;
+t = TimeStretch;
+b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
+	t.stretchRT(s, b, 0, 0, 100, 2, 0, 32768);
+::
+
+
+
