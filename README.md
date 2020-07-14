@@ -1,6 +1,6 @@
 # TimeStretch
 
-Python3 version by Alex Ness
+Python3 version by Alex Ness - alexness.bandcamp.com
 
 SuperCollider version by Sam Pluta - sampluta.com
 
