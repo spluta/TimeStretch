@@ -71,9 +71,7 @@ TimeStretch {
 				});
 				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate);
 				sig = DelayC.ar(sig*bigEnv*amp, 65536-fftSize/SampleRate.ir, 65536-fftSize/SampleRate.ir);
-				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);/*
-				sig[2] = DelayC.ar(sig[2], trigPeriod/2, trigPeriod/2);
-				sig[3] = DelayC.ar(sig[3], 3*trigPeriod/4, 3*trigPeriod/4);*/
+				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);
 				Out.ar(out, Pan2.ar(Mix.new(sig), pan)/2);
 			}).writeDefFile;
 

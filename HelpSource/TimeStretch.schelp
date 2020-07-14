@@ -1,6 +1,6 @@
 class:: TimeStretch
 summary:: Time Stretch
-related:: FFT, IFFT, PV_Diffuser, PV_BrickWall
+related:: Classes/FFT, Classes/IFFT, Classes/PV_Diffuser, Classes/PV_BrickWall
 categories::  UGens>FFT
 
 Description::
@@ -108,17 +108,17 @@ t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordings
 Using the numSplits argument:
 
 code::
-	t = TimeStretch;
-	t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 10, numSplits:4);
+t = TimeStretch;
+t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 10, numSplits:4);
 ::
 
 A real-time version (which is basically a PaulStretch algorithm):
 
 code::
-	s.boot;
+s.boot;
 t = TimeStretch;
 b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
-	t.stretchRT(s, b, 0, 0, 100, 2, 0, 32768);
+t.stretchRT(s, b, 0, 0, 100, 2, 0, 32768);
 ::
 
 

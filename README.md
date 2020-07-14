@@ -4,7 +4,7 @@ Python3 version by Alex Ness
 
 SuperCollider version by Sam Pluta - sampluta.com
 
-Implements a phase bashed FFT (SC) or STFT (python) time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
+Implements a phase randomized FFT (SC) or STFT (python) time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
 0-86hz : 65536,
 86-172hz : 32768,
