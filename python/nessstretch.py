@@ -10,7 +10,7 @@ import argparse
 from os.path import join
 import numpy as np
 import scipy
-from fancystft import fstft, ifstft # fancy STFT
+from fancystft import fstft, ifstft, fancy_stretch # fancy STFT
 
 DEFAULT_RATE_NUMERATOR = 1
 DEFAULT_RATE_DENOMINATOR = 8
@@ -37,6 +37,10 @@ def render(infile, outfile, playback_rate):
     for channel in range(n_channels):
         print(f'processing channel {channel+1}')
         input_channel = normalized_input_data[:, channel]
+        output = fancy_stretch(input_channel)
+        exit()
+
+
 
         f, t, Zxx = fstft(input_channel, input_sample_rate)
         print('separating magnitude and phase. . .')
