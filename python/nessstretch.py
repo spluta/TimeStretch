@@ -13,7 +13,7 @@ import scipy
 from fancystft import fancy_stretch
 
 DEFAULT_RATE_NUMERATOR = 1
-DEFAULT_RATE_DENOMINATOR = 2
+DEFAULT_RATE_DENOMINATOR = 8
 
 def render(infile, outfile, playback_rate):
     print(f'loading input file {infile.name}')
