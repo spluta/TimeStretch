@@ -9,6 +9,7 @@ TimeStretch {
 	classvar synths;
 	//by Sam Pluta - sampluta.com
 	// Based on the Alex Ness's NessStretch algorith in Python
+	// thanks to Jean-Philippe Drecourt for his implementation of Paul Stretch, which was a huge influence on this code
 
 	*initClass {
 		synths = List.newClear(0);
@@ -61,13 +62,15 @@ TimeStretch {
 
 				pos = [pos, pos + jump];
 
+				//Latch.ar(pos, trig).poll;
+
 				sig = GrainBuf.ar(1, trig, trigPeriod, bufnum, 1, pos, envbufnum: -1);
 				sig = sig.collect({ |item, i|
 					chain = FFT(LocalBuf(fftSize), item, hop: 1.0, wintype: -1);
 					chain = PV_Diffuser(chain, 1-trig);
 					chain = PV_BrickWall(chain, hiPass);
 					chain = PV_BrickWall(chain, lowPass);
-					item = IFFT(chain, wintype: 0);
+					item = IFFT(chain, wintype: 1);
 				});
 				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate);
 				sig = DelayC.ar(sig*bigEnv*amp, 65536-fftSize/SampleRate.ir, 65536-fftSize/SampleRate.ir);
@@ -78,7 +81,7 @@ TimeStretch {
 		}
 	}
 
-	*stretchNRT { |inFile, outFile, durMult, fftMax = 65536, overlaps = 4, numSplits = 9, amp = 1|
+	*stretchNRT { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, amp = 1|
 		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat;
 
 		inFile = PathName(inFile);
@@ -146,11 +149,33 @@ TimeStretch {
 		^nrtJam
 	}
 
-	*stretchRT { |target, bufferChan, outBus=0, pan=0, durMult=10, overlaps=4, startPos = 0, fftSize = 8192, amp = 1|
+	*stretchRT1 { |target, bufferChan, outBus=0, pan=0, durMult=10, overlaps=4, startPos = 0, fftSize = 8192, amp = 1|
+
 		if(overlaps==2){
 			synths.add(Synth.new("pb_monoStretch_Overlap2", [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \startPos, startPos, \fftSize, fftSize, \amp, amp, \gate, 1], target));
 		}{
 			synths.add(Synth.new("pb_monoStretch_Overlap4", [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \startPos, startPos, \fftSize, fftSize, \amp, amp, \gate, 1], target));
+		}
+	}
+
+	*stretchRT { |target, bufferChan, outBus=0, pan=0, durMult=10, overlaps=4, startPos = 0, fftMax = 32768, numSplits = 4, amp = 1|
+		var filtVals, fftVals;
+
+		filtVals = List.fill(8, {|i| 1/2**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
+
+		if((numSplits-1)<8){ filtVals = filtVals.copyRange(0, (numSplits-1))};
+		filtVals.put(filtVals.size-1, [filtVals[filtVals.size-1][0], 1]);
+
+		fftVals = List.fill(filtVals.size, {|i| fftMax/(2**i)});
+
+		if(overlaps==2){
+			filtVals.do{|fv, i|
+				synths.add(Synth.new("pb_monoStretch_Overlap2", [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \startPos, startPos, \fftSize, fftVals[i], \amp, amp, \gate, 1], target));
+			}
+		}{
+			filtVals.do{|fv, i|
+				synths.add(Synth.new("pb_monoStretch_Overlap4", [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \startPos, startPos, \fftSize, fftVals[i], \amp, amp, \gate, 1], target));
+			}
 		}
 	}
 

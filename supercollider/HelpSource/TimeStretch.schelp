@@ -48,7 +48,7 @@ The largest FFT buffer size, for the lowest frequency data.
 
 argument::overlaps
 
-The default is 4, but 2 is also an option. 2 can be shakey. 4 can be smeary. Life is a mess. Pick your poison.
+The default is 2, but 4 is also an option. 2 uses a Hann window in the IFFT. 4 uses a Sine window.
 
 argument::numSplits
 
@@ -84,7 +84,7 @@ The multiple of the stretch.
 
 argument::overlaps
 
-The default is 4, but 2 is also an option. 2 can be shakey. 4 can be smeary.
+The default is 4, but 2 is also an option. 2 might currently be broken in Real-Time.
 
 argument::startPos
 
@@ -99,27 +99,35 @@ Examples::
 Will start an NRT server, load the file, and execute the time stretch. Each instance of this will run on its own server, so you can run as many simultaneously as your computer can handle.
 
 code::
-t = TimeStretch;
+
 
 //The new sound file will go into the default recordings directory in SC
-t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 10);
+TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 10);
 ::
 
 Using the numSplits argument:
 
 code::
-t = TimeStretch;
-t.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 10, numSplits:4);
+
+TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10d.wav", 10, numSplits:4);
 ::
 
-A real-time version (which is basically a PaulStretch algorithm):
+A real-time version, with 1 FFT layer (which is basically a PaulStretch algorithm):
 
 code::
 s.boot;
-t = TimeStretch;
+
 b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
-t.stretchRT(s, b, 0, 0, 100, 2, 0, 32768);
+
+TimeStretch.stretchRT1(s, b, 0, 0, 100, 4, 0, 32768/4);
+TimeStretch.stop
 ::
 
+A real-time version with many FFT Layers:
 
+code::
+s.boot;
+b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
+TimeStretch.stretchRT(s, b, 0, 0, 100, 4, 0, 32768/2, 4);
+::
 
