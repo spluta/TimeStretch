@@ -10,14 +10,10 @@ import argparse
 from os.path import join
 import numpy as np
 import scipy
-from fancystft import fstft, ifstft, fancy_stretch # fancy STFT
+from fancystft import fancy_stretch
 
 DEFAULT_RATE_NUMERATOR = 1
-DEFAULT_RATE_DENOMINATOR = 8
-
-def random_phases(Zxx):
-    '''Zxx is a time-stretched STFT'''
-    return np.exp(2 * np.pi * 1.j * np.random.rand(*Zxx.shape))
+DEFAULT_RATE_DENOMINATOR = 2
 
 def render(infile, outfile, playback_rate):
     print(f'loading input file {infile.name}')
@@ -37,28 +33,7 @@ def render(infile, outfile, playback_rate):
     for channel in range(n_channels):
         print(f'processing channel {channel+1}')
         input_channel = normalized_input_data[:, channel]
-        output = fancy_stretch(input_channel)
-        exit()
-
-
-
-        f, t, Zxx = fstft(input_channel, input_sample_rate)
-        print('separating magnitude and phase. . .')
-        Zxx_mag = np.abs(Zxx)
-        freqs, frames = Zxx.shape
-
-        print('interpolating. . .')
-        interpFunc = scipy.interpolate.interp2d(range(frames), range(freqs), Zxx_mag, kind='linear')
-        Zxx_stretched = interpFunc(np.arange(0, frames, playback_rate), range(freqs))
-
-        # generate separate random phases for each channel
-        print('generating random phases. . . ')
-        Zxx_phases = random_phases(Zxx_stretched)
-
-        print('randomizing STFT phases. . .')
-        Zxx_random = Zxx_phases * Zxx_stretched
-
-        output.append(ifstft(Zxx_random))
+        output = fancy_stretch(input_channel, playback_rate)
 
     print('creating audio array. . .')
 
