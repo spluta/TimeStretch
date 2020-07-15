@@ -35,11 +35,11 @@ class AnalysisBand(object):
         self.amplitudes = np.abs(zxx)
 
 def analyze_band_stft(input_signal, nfft, overlap, window='hann'):
-    # print(f"nfft = {nfft}")
+    '''Currently unused, but left in to explore using this rather than
+    the self-windowed and hopped analyze_band_rfft below'''
     hop_size = nfft // overlap
     noverlap = nfft - hop_size
     freqs, times, zxx = scipy.signal.stft(input_signal, nperseg=nfft, noverlap=noverlap, window=window)
-    # print(f"analyze band zxx shape {zxx.shape}")
     return AnalysisBand(nfft=nfft, hop_size=hop_size, times=times, zxx=zxx, window=window)
 
 def analyze_band_rfft(input_signal, nfft, overlap, window='hann'):
@@ -48,14 +48,13 @@ def analyze_band_rfft(input_signal, nfft, overlap, window='hann'):
     current_time = 0
     zxx = []
     times = []
-    while current_time < len(input_signal)-100000:
+    # TODO: handle the end better, perhaps with zero padding
+    while current_time < len(input_signal)-nfft-1:
         analysis_frame = input_signal[current_time : current_time + nfft] * window_array
         zxx.append(np.fft.rfft(analysis_frame))
         times.append(current_time)
         current_time += hop_size
-    # print(f"zxx len {len(zxx)}")
     return AnalysisBand(nfft=nfft, hop_size=hop_size, times=np.array(times), zxx=np.swapaxes(np.array(zxx),0,1), window=window)
-
 
 def analyze(input_signal, overlap, nffts, window='hann'):
     analysis = {}
@@ -65,23 +64,17 @@ def analyze(input_signal, overlap, nffts, window='hann'):
     return analysis
 
 def bandpass_filter_impulse(frame_size, low_bin, high_bin):
-    # print(frame_size, low_bin, high_bin)
     return np.concatenate([np.zeros(low_bin), np.ones(1 + high_bin - low_bin), np.zeros(frame_size - high_bin - 1)])
 
 def synthesize_frame(frame_amplitudes, filter_impulse, window_array):
     # TODO: only make random phases for bins we're going to use
-    phases = np.random.uniform(0, 2*np.pi, frame_amplitudes.shape) * 1j
-    # print(frame_amplitudes.shape)
-    # print(filter_impulse.shape)
-    # print(window_array.shape)
+    # these few lines cribbed from https://github.com/paulnasca/paulstretch_python
+    phases = np.random.uniform(0, 2 * np.pi, frame_amplitudes.shape) * 1j
     frame = frame_amplitudes * np.exp(phases) * filter_impulse
-    # foo = scipy.fft.irfft(frame)
-    # print(foo.shape)
     frame_output = scipy.fft.irfft(frame) * window_array
     return frame_output
 
 def synthesize_band(band, low_bin, high_bin, playback_rate):
-    # print(f"band shape: {band.amplitudes.shape}")
     window_array = scipy.signal.get_window(band.window, band.nfft)
     filter_impulse = bandpass_filter_impulse(band.frame_size, low_bin, high_bin)
     interp_func = scipy.interpolate.interp1d(band.times, band.amplitudes)
@@ -89,30 +82,18 @@ def synthesize_band(band, low_bin, high_bin, playback_rate):
     target_length = last_time_in_source / playback_rate
     hop_size = band.hop_size
     cur_output_time = 0
-    # print(f"target_length: {target_length}")
-    frames_processed = 0
     band_output = np.zeros(int(target_length) + band.nfft)
     while cur_output_time < target_length:
         source_time = cur_output_time * playback_rate
         frame_amplitudes = interp_func(source_time)
         frame_output = synthesize_frame(frame_amplitudes, filter_impulse, window_array)
-        # if np.max(frame_output) < 0.01:
-        #     print(f"max is {np.max(frame_output)}")
-        # print(frame_output.shape)
-        # print(f"frame output shape: {frame_output.shape}")
-        # print(f"target region shape: {band_output[cur_output_time:(cur_output_time + frame_output.shape[0])].shape}")
         band_output[cur_output_time:(cur_output_time + len(frame_output))] += frame_output
         cur_output_time += hop_size
-        # frames_processed += 1
-        # print(f"cur_output_time: {cur_output_time}")
-        # if (frames_processed % 100 == 0):
-        #     pct_done = cur_output_time / target_length
-        #     print(f"percent done: {pct_done}")
     return band_output
 
-def fancy_stretch(input_signal, playback_rate, overlap=4):
+def fancy_stretch(input_signal, playback_rate, overlap=4, window='hann'):
     band_outputs = {}
-    analysis = analyze(input_signal, overlap, fancy_bands.keys(), window='hann')
+    analysis = analyze(input_signal, overlap, fancy_bands.keys(), window=window)
     for nfft, analysis_band in analysis.items():
         low_bin, high_bin = fancy_bands[nfft]
         print(f'running synthesis for size {nfft}')
