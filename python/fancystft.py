@@ -11,8 +11,6 @@ import numpy as np
 import scipy.signal
 import scipy.io.wavfile
 
-import matplotlib.pyplot as plt
-
 topWindow = 256
 nBands = 9
 nffts = [topWindow * pow(2, i) for i in range(nBands)]
@@ -87,10 +85,10 @@ def fstft(x, fs):
 
         # crop the bins
         Zxx_cropped = Zxx[lowSTFTBin:highSTFTBin,:]
-        
+
         # add a range of bins from the current STFT to the start (bottom)
         # of the output array
-        
+
         if Zxx_sum is None:
             Zxx_sum = Zxx_cropped
             numFreqs, numFrames = Zxx_sum.shape
@@ -118,11 +116,11 @@ def ifstft(Zxx_sum):
 
         # create an empty STFT of the appropriate size
         Zxx_pad = np.zeros((nfft//2 + 1, numFrames), dtype='complex128')
-        print('nfft : %d, noverlap: %d, Zxx_pad.shape: %s' % (nfft, noverlap, str(Zxx_pad.shape))) 
-        
+        print('nfft : %d, noverlap: %d, Zxx_pad.shape: %s' % (nfft, noverlap, str(Zxx_pad.shape)))
+
         # paste in the appropriate FSTFT bins
         Zxx_pad[lowSTFTBin:highSTFTBin] += Zxx
-            
+
         # take the ISTFT with the given overlap
         t, x = scipy.signal.istft(Zxx_pad, nfft=nfft, noverlap=noverlap, nperseg=nfft)
 
