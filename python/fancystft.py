@@ -98,6 +98,7 @@ def fancy_stretch(input_signal, playback_rate, overlap=4, window='hann'):
         low_bin, high_bin = fancy_bands[nfft]
         print(f'running synthesis for size {nfft}')
         band_outputs[nfft] = synthesize_band(analysis_band, low_bin, high_bin, playback_rate)
+    print('mixing bands')
     max_length = max([len(band_output) for band_output in band_outputs.values()])
     zeros = np.zeros(max_length)
     mix_bus = np.copy(zeros)

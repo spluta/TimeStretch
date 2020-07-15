@@ -48,7 +48,7 @@ def render(infile, outfile, playback_rate, overlap, window):
     for channel in range(n_channels):
         print(f'processing channel {channel+1}')
         input_channel = normalized_input_data[:, channel]
-        output = fancy_stretch(input_channel, playback_rate, overlap=overlap, window=window)
+        output.append(fancy_stretch(input_channel, playback_rate, overlap=overlap, window=window))
     # Transpose array: see https://github.com/bastibe/SoundFile/issues/203
     audio_array = np.int16(np.array(output).T * max_dtype_val)
     print('writing audio. . .')
@@ -82,6 +82,6 @@ if __name__ == "__main__":
         '-w', '--window',
         choices=WINDOW_TYPES,
         default=DEFAULT_WINDOW,
-        help=f'what window shape will be used for analysis and synthesis. Available options are: ', '.join(WINDOW_TYPES))
+        help=f"what window shape will be used for analysis and synthesis. Available options are: {', '.join(WINDOW_TYPES)}")
     args = parser.parse_args()
     perform_stretch(args)
