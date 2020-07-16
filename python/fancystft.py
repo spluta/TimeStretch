@@ -14,7 +14,7 @@ import scipy.io.wavfile
 import scipy.signal
 
 fancy_bands = {
-    256: (65, 128),
+    256: (65, 129),
     512: (65, 129),
     1024: (65, 129),
     2048: (65, 129),
@@ -48,7 +48,12 @@ def analyze_band_rfft(input_signal, nfft, overlap, window='hann'):
     current_time = 0
     zxx = []
     times = []
-    # TODO: handle the end better, perhaps with zero padding
+
+    # Pad start of input signal with a half window of zeros
+    input_signal = np.insert(input_signal, 0, np.zeros(nfft//2))
+    # Pad end of input signal end with a full window of zeros
+    input_signal = np.append(input_signal, np.zeros(nfft))
+    
     while current_time < len(input_signal)-nfft-1:
         analysis_frame = input_signal[current_time : current_time + nfft] * window_array
         zxx.append(np.fft.rfft(analysis_frame))
@@ -64,7 +69,7 @@ def analyze(input_signal, overlap, nffts, window='hann'):
     return analysis
 
 def bandpass_filter_impulse(frame_size, low_bin, high_bin):
-    return np.concatenate([np.zeros(low_bin), np.ones(1 + high_bin - low_bin), np.zeros(frame_size - high_bin - 1)])
+    return np.concatenate([np.zeros(low_bin), np.ones(high_bin - low_bin), np.zeros(frame_size - high_bin)])
 
 def synthesize_frame(frame_amplitudes, filter_impulse, window_array):
     # TODO: only make random phases for bins we're going to use
@@ -91,6 +96,13 @@ def synthesize_band(band, low_bin, high_bin, playback_rate):
         cur_output_time += hop_size
     return band_output
 
+def normalize(signal, reference_signal):
+    max_ref = np.max(reference_signal)
+    max_sig = np.max(signal)
+    norm_ratio = max_ref / max_sig
+    norm_sig = signal * norm_ratio
+    return norm_sig
+    
 def fancy_stretch(input_signal, playback_rate, overlap=4, window='hann'):
     band_outputs = {}
     analysis = analyze(input_signal, overlap, fancy_bands.keys(), window=window)
@@ -106,4 +118,5 @@ def fancy_stretch(input_signal, playback_rate, overlap=4, window='hann'):
         temp = np.copy(zeros)
         temp[0:len(band_output)] = band_output
         mix_bus += temp
-    return mix_bus
+    mix_bus_norm = normalize(mix_bus, input_signal)
+    return mix_bus_norm
