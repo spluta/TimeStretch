@@ -32,6 +32,12 @@ WINDOW_TYPES = [
 ]
 DEFAULT_WINDOW = 'hann'
 
+def norm_factor(signal, reference_signal):
+    max_ref = np.max(reference_signal)
+    max_sig = np.max(signal)
+    factor = max_ref / max_sig
+    return factor
+
 def render(infile, outfile, playback_rate, overlap, window):
     print(f'loading input file {infile.name}')
     input_sample_rate, raw_input_data = scipy.io.wavfile.read(infile)
@@ -48,10 +54,12 @@ def render(infile, outfile, playback_rate, overlap, window):
     for channel in range(n_channels):
         print(f'processing channel {channel+1}')
         input_channel = normalized_input_data[:, channel]
-        output.append(fancy_stretch(input_channel, playback_rate, overlap=overlap, window=window))
+        output.append(fancy_stretch(input_channel, playback_rate, channel, overlap=overlap, window=window))
+    print('normalizing audio')
+    factor = norm_factor(output, normalized_input_data)
     # Transpose array: see https://github.com/bastibe/SoundFile/issues/203
-    audio_array = np.int16(np.array(output).T * max_dtype_val)
-    print('writing audio. . .')
+    audio_array = np.int16(np.array(output).T * factor * max_dtype_val)
+    print('writing audio')
     scipy.io.wavfile.write(outfile, input_sample_rate, audio_array)
     print(f'output file path is {args.outfile.name}')
 
