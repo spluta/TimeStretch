@@ -1,13 +1,13 @@
 * Short term:
-  * Add temp file cleanup.
-  * Add a memory map for audio_array?
-  * Documentation
-  * Do some stretching!
-  * Send fan mail to Paul Nasca
+  * [ ] Add temp file cleanup.
+  * [ ] Add a memory map for audio_array?
+  * [x] Documentation
+  * [ ] Do some stretching!
+  * [ ] Send fan mail to Paul Nasca
 
 * Longer term:
-  * Make the audio formats more flexible.
-  * Make the analysis settings more flexible.
+  * [ ] Make the audio formats more flexible.
+  * [ ] Make the analysis settings more flexible.
     * Accept a CSV of fancy_bands (frequency, low bin, high bin) data
 
 * Questions:
