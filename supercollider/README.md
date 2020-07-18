@@ -16,4 +16,8 @@ Implements a phase randomized FFT (SC) time stretch algorithm, the Ness Stretch,
 5512-11025 : 512,
 11025-22050 : 256
 
+For the python implementation, go here:
+
+https://github.com/spluta/TimeStretch
+
 Special thanks to Jean-Philippe Drecourt for his implementation of Paulstretch, which was a huge influence on this code
