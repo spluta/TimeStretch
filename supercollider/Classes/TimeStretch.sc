@@ -43,7 +43,7 @@ TimeStretch {
 				trigEnv = 1-(Slew.ar(1-Trig1.ar(Impulse.ar(SampleRate.ir/fftSize), fftSize/2/SampleRate.ir), 44100/(fftSize/2), 44100/(fftSize/2))**2)**1.25;
 
 				sig = DelayC.ar(sig*bigEnv*amp, 65536-fftSize/SampleRate.ir, 65536-fftSize/SampleRate.ir);
-	trigEnv = DelayC.ar(trigEnv, 65536-fftSize-BlockSize.ir/SampleRate.ir, 65536-fftSize-BlockSize.ir/SampleRate.ir);
+				trigEnv = DelayC.ar(trigEnv, 65536-fftSize-BlockSize.ir/SampleRate.ir, 65536-fftSize-BlockSize.ir/SampleRate.ir);
 
 				sig = sig*trigEnv;
 
@@ -52,7 +52,7 @@ TimeStretch {
 				sig[3] = DelayC.ar(sig[3], 3*trigPeriod/4, 3*trigPeriod/4);
 				Out.ar(out, Pan2.ar(Mix.new(sig), pan)/2);
 			}).writeDefFile;
-SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, hiPass = 0, lowPass=0, amp = 1, gate = 1|
+			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, hiPass = 0, lowPass=0, amp = 1, gate = 1|
 				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv;
 				trigPeriod = (fftSize/SampleRate.ir);
 				trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
@@ -79,12 +79,12 @@ SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, st
 				trigEnv = 1-(Slew.ar(1-Trig1.ar(Impulse.ar(SampleRate.ir/fftSize), fftSize/2/SampleRate.ir), 44100/(fftSize/2), 44100/(fftSize/2))**2)**1.25;
 
 				sig = DelayC.ar(sig*bigEnv*amp, 65536-fftSize/SampleRate.ir, 65536-fftSize/SampleRate.ir);
-	trigEnv = DelayC.ar(trigEnv, 65536-fftSize-BlockSize.ir/SampleRate.ir, 65536-fftSize-BlockSize.ir/SampleRate.ir);
-	sig = sig*trigEnv;
+				trigEnv = DelayC.ar(trigEnv, 65536-fftSize-BlockSize.ir/SampleRate.ir, 65536-fftSize-BlockSize.ir/SampleRate.ir);
+				sig = sig*trigEnv;
 
 				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);
 				Out.ar(out, Pan2.ar(Mix.new(sig), pan)/2);
-}).writeDefFile;
+			}).writeDefFile;
 
 		}
 	}
@@ -160,8 +160,8 @@ SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, st
 	*stretchRT1 { |target, bufferChan, outBus=0, pan=0, durMult=10, overlaps=4, startPos = 0, fftSize = 8192, amp = 1|
 
 		//filtVals.do{|fv, i|
-				synths.add(Synth.new("pb_monoStretch_Overlap"++overlaps, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \startPos, startPos, \fftSize, fftSize, \amp, amp, \gate, 1], target));
-			//}
+		synths.add(Synth.new("pb_monoStretch_Overlap"++overlaps, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \startPos, startPos, \fftSize, fftSize, \amp, amp, \gate, 1], target));
+		//}
 	}
 
 	*stretchRT { |target, bufferChan, outBus=0, pan=0, durMult=10, overlaps=4, startPos = 0, fftMax = 32768, numSplits = 4, amp = 1|
@@ -174,9 +174,9 @@ SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, st
 
 		fftVals = List.fill(filtVals.size, {|i| fftMax/(2**i)});
 
-			filtVals.do{|fv, i|
-				synths.add(Synth.new("pb_monoStretch_Overlap"++overlaps, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \startPos, startPos, \fftSize, fftVals[i], \amp, amp, \gate, 1], target));
-			}
+		filtVals.do{|fv, i|
+			synths.add(Synth.new("pb_monoStretch_Overlap"++overlaps, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \startPos, startPos, \fftSize, fftVals[i], \amp, amp, \gate, 1], target));
+		}
 	}
 
 	*stop {
