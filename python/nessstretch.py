@@ -69,8 +69,14 @@ def perform_stretch(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('infile', type=argparse.FileType('rb'))
-    parser.add_argument('outfile', type=argparse.FileType('wb'))
+    parser.add_argument(
+        'infile',
+        type=argparse.FileType('rb'),
+        help="path to 16 bit wave source file")
+    parser.add_argument(
+        'outfile',
+        type=argparse.FileType('wb'),
+        help="path to write output file")
     parser.add_argument(
         '-n', '--rate_numerator',
         type=float,
