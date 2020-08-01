@@ -119,7 +119,7 @@ s.boot;
 
 b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
 
-TimeStretch.stretchRT1(s, b, 0, 0, 100, 4, 0, 32768/4);
+TimeStretch.stretchRT1(s, b, 0, 0, 100, 2, 0.5, 32768/4);
 TimeStretch.stop
 ::
 
@@ -128,6 +128,6 @@ A real-time version with many FFT Layers:
 code::
 s.boot;
 b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
-TimeStretch.stretchRT(s, b, 0, 0, 100, 4, 0, 32768/2, 4);
+TimeStretch.stretchRT(s, b, 0, 0, 100, 4, 0.5, 32768/2, 4);
 ::
 
