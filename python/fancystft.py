@@ -8,7 +8,6 @@
 # Licence: CC BY-SA 3.0 US
 
 from functools import reduce
-from tempfile import mkdtemp
 from os.path import join
 import numpy as np
 import scipy.interpolate
@@ -28,7 +27,6 @@ fancy_bands = {
     65536: (0, 129),
     }
 
-temp_dir = mkdtemp(dir='.')
     
 class AnalysisBand(object):
     def __init__(self, nfft=None, overlap=None, window=None):
@@ -42,18 +40,24 @@ class AnalysisBand(object):
         self.bins = self.high_bin - self.low_bin
 
     def bandpass_filter_impulse(self):
+        return np.concatenate([np.zeros(self.low_bin), np.ones(self.bins), np.zeros(self.nrfft - self.high_bin)])
+
+    def white_noise_filter_impulse(self):
         phases = np.random.uniform(0, 2 * np.pi, self.bins) * 1j
         return np.concatenate([np.zeros(self.low_bin), np.exp(phases), np.zeros(self.nrfft - self.high_bin)])
     
-    def process_frame(self, padded_input_signal, current_input_time, current_output_time, mix_bus):
+    def process_frame(self, padded_input_signal, current_input_time, current_output_time, mix_bus, randomize_phases):
         analysis_frame = padded_input_signal[int(current_input_time) : int(current_input_time) + self.nfft] * self.window_array
         rfft = np.fft.rfft(analysis_frame)
-        amplitudes = np.abs(rfft)
-        bandpass_frame = amplitudes * self.bandpass_filter_impulse()
+        if randomize_phases:
+            amplitudes = np.abs(rfft)
+            bandpass_frame = amplitudes * self.white_noise_filter_impulse()
+        else:
+            bandpass_frame = rfft * self.bandpass_filter_impulse()       
         frame_output = scipy.fft.irfft(bandpass_frame) * self.window_array
         mix_bus[int(current_output_time) : int(current_output_time) + self.nfft] += frame_output
     
-    def stretch(self, input_signal, playback_rate, mix_bus):
+    def stretch(self, input_signal, playback_rate, mix_bus, randomize_phases):
         padded_input_signal = np.concatenate([np.zeros(self.nfft//2), input_signal, np.zeros(self.nfft//2)])
         input_end_time = len(padded_input_signal) - self.nfft
         current_input_time = 0
@@ -62,17 +66,17 @@ class AnalysisBand(object):
             progress = int(100 * current_input_time / input_end_time)
             sys.stdout.write(f'\t{progress}% complete \r')
             sys.stdout.flush()
-            self.process_frame(padded_input_signal, current_input_time, current_output_time, mix_bus)
+            self.process_frame(padded_input_signal, current_input_time, current_output_time, mix_bus, randomize_phases)
             current_input_time += self.hop_size * playback_rate
             current_output_time += self.hop_size
         print('\t100% complete')
 
-def fancy_stretch(input_signal, playback_rate, channel, overlap=4, window='hann'):
+def fancy_stretch(temp_dir, input_signal, playback_rate, channel, overlap=4, window='hann', randomize_phases=True):
     target_length = np.ceil(len(input_signal) / playback_rate) + max(fancy_bands.keys())
     mix_bus_path = join(temp_dir, f'channel-{channel}.dat')
     mix_bus = np.memmap(mix_bus_path, dtype='float32', mode='w+', shape=int(target_length))
     for nfft in fancy_bands.keys():
         band = AnalysisBand(nfft, overlap, window)
         print(f'stretching size {nfft}')
-        band.stretch(input_signal, playback_rate, mix_bus)
+        band.stretch(input_signal, playback_rate, mix_bus, randomize_phases)
     return mix_bus

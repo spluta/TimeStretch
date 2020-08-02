@@ -12,6 +12,7 @@ from os.path import join
 import numpy as np
 import scipy
 from fancystft import fancy_stretch
+from tempfile import TemporaryDirectory
 
 DEFAULT_RATE_NUMERATOR = 1
 DEFAULT_RATE_DENOMINATOR = 8
@@ -31,6 +32,7 @@ WINDOW_TYPES = [
     'barthann',
 ]
 DEFAULT_WINDOW = 'hann'
+DEFAULT_PHASE_RANDOMIZATION = True
 
 def norm_factor(signal, reference_signal):
     max_ref = np.max(reference_signal)
@@ -38,7 +40,7 @@ def norm_factor(signal, reference_signal):
     factor = max_ref / max_sig
     return factor
 
-def render(infile, outfile, playback_rate, overlap, window):
+def render(infile, outfile, playback_rate, overlap, window, randomize_phases):
     print(f'loading input file {infile.name}')
     input_sample_rate, raw_input_data = scipy.io.wavfile.read(infile)
     n_input_frames, n_channels = raw_input_data.shape
@@ -51,21 +53,26 @@ def render(infile, outfile, playback_rate, overlap, window):
     max_dtype_val = np.iinfo(input_dtype).max
     normalized_input_data = raw_input_data / max_dtype_val
     output = []
-    for channel in range(n_channels):
-        print(f'processing channel {channel+1}')
-        input_channel = normalized_input_data[:, channel]
-        output.append(fancy_stretch(input_channel, playback_rate, channel, overlap=overlap, window=window))
-    print('normalizing audio')
-    factor = norm_factor(output, normalized_input_data)
-    # Transpose array: see https://github.com/bastibe/SoundFile/issues/203
-    audio_array = np.int16(np.array(output).T * factor * max_dtype_val)
-    print('writing audio')
-    scipy.io.wavfile.write(outfile, input_sample_rate, audio_array)
-    print(f'output file path is {args.outfile.name}')
-
+    with TemporaryDirectory(dir='.') as temp_dir: 
+        for channel in range(n_channels):
+            print(f'processing channel {channel+1}')
+            input_channel = normalized_input_data[:, channel]
+            output.append(fancy_stretch(temp_dir, input_channel, playback_rate, channel, overlap=overlap, window=window, randomize_phases=randomize_phases))
+        print('normalizing audio')
+        factor = norm_factor(output, normalized_input_data)
+        audio_array_path = join(temp_dir, 'audio.dat')
+        audio_array_shape = (n_channels, len(output))
+        audio_array = np.memmap(audio_array_path, dtype='int16', mode='w+', shape=audio_array_shape)
+        # Transpose array: see https://github.com/bastibe/SoundFile/issues/203
+        audio_array = np.int16(np.array(output).T * factor * max_dtype_val)
+        print('writing audio')
+        scipy.io.wavfile.write(outfile, input_sample_rate, audio_array)
+        print(f'output file path is {args.outfile.name}')
+    print(f'deleting temporary files')
+        
 def perform_stretch(args):
     playback_rate = args.rate_numerator / args.rate_denominator
-    render(args.infile, args.outfile, playback_rate, args.overlap, args.window)
+    render(args.infile, args.outfile, playback_rate, args.overlap, args.window, args.randomize_phases)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -97,5 +104,16 @@ if __name__ == "__main__":
         choices=WINDOW_TYPES,
         default=DEFAULT_WINDOW,
         help=f"what window shape will be used for analysis and synthesis. Available options are: {', '.join(WINDOW_TYPES)}")
+    parser.add_argument(
+        '-r', '--randomize-phases',
+        dest='randomize_phases', 
+        action='store_true',
+        help=f'Randomize the analysis bin phases before resynthesis, default is {not DEFAULT_PHASE_RANDOMIZATION}')
+    parser.add_argument(
+        '-k', '--keep-phases',
+        dest='randomize_phases', 
+        action='store_false',
+        help=f'Preserve analysis bin phases, default is {DEFAULT_PHASE_RANDOMIZATION}')
+    parser.set_defaults(randomize_phases=True)
     args = parser.parse_args()
     perform_stretch(args)
