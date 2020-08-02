@@ -37,6 +37,11 @@ optional arguments:
                         synthesis. Available options are: boxcar, triang,
                         blackman, hamming, hann, bartlett, flattop, parzen,
                         bohman, blackmanharris, nuttall, barthann
+  -r, --randomize-phases
+                        Randomize the analysis bin phases before resynthesis,
+                        default is False
+  -k, --keep-phases     Preserve analysis bin phases, default is True
+
 ```
 
 Input file must be a 16-bit signed integer wave file.
