@@ -100,6 +100,8 @@ Will start an NRT server, load the file, and execute the time stretch. Each inst
 
 code::
 
+//You need to increase the default Server memory allocation when using multiple FFT layers
+Server.local.options.memSize = 16384;
 
 //The new sound file will go into the default recordings directory in SC
 TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 10);
@@ -126,7 +128,7 @@ TimeStretch.stop
 A real-time version with many FFT Layers:
 
 code::
-s.boot;
+s.options.memSize = 16384; s.reboot;
 b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
 TimeStretch.stretchRT(s, b, 0, 0, 100, 4, 0.5, 32768/2, 4);
 ::
