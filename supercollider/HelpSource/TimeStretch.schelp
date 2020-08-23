@@ -48,7 +48,9 @@ The largest FFT buffer size, for the lowest frequency data.
 
 argument::overlaps
 
-The default is 2, but 4 is also an option. 2 uses a Hann window in the IFFT. 4 uses a Sine window.
+The default is 2, but 4 is also an option. 4 uses the default IFFT window. 2 uses the custom window defined by the PaulStretch algorithm.
+
+If given a 2 or 4, all of the FFT bands will use the same overlap. However, if the user gives an array of values, like [2,2,2,2,2,3,3,4,4], each band will have its own overlap setting.
 
 argument::numSplits
 
@@ -105,6 +107,9 @@ TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.
 
 //If the above throws an error, you may need to increase the default Server memory allocation when using multiple FFT layers. If so, run the following before running the above line of code
 Server.local.options.memSize = 16384;
+
+//One can also give different overlap settings per stretch band
+TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 10, 65536, [2,2,2,2,2,3,3,4,4]);
 
 ::
 
