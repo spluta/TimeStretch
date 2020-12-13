@@ -66,7 +66,7 @@ TimeStretch {
 				trigEnv = 1-(Slew.ar(
 					1-Trig1.ar(trig, fftSize/2/SampleRate.ir),
 					SampleRate.ir/(fftSize/2),
-					SampleRate.ir/(fftSize/2))**2)**1.25;
+					SampleRate.ir/(fftSize/2))**2)**1.2047104;
 
 				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*trigEnv;
 
