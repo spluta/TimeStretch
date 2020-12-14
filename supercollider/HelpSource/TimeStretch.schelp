@@ -28,7 +28,7 @@ WARNING: At this time the algorithm only works properly with buffers with a samp
 
 classmethods::
 
-method::stretchNRT
+method::stretch
 
 argument::inFile
 
@@ -57,6 +57,18 @@ argument::numSplits
 	By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below 22050, then subsequent octaves down from there, leaving everything below 86hz to the largest buffer. However, some material, like classical orchestral music, gets swimmy above a certain register (or the swimminess that is welcome in pop becomes unwelcome). Here you can set the split to 8 or lower. Setting the number to 7, for instance, leaves us with a top FFT dealing with the frequency range above 2756 with a bin size of 1024 rather the audio range above 11025 with a bin size of 256, which is the default.
 
 	Simple answer: if it is swimmy, try a 8 or lower here. For string music, for instance, I found 4 to be best. A number above 9 will do nothing.
+
+argument::wintype
+
+Choose between the default SuperCollider sine window (0) and the classic paulstretch window (1).
+
+Sine wave is default, but the classic paulstretch window uses the following shape:
+
+code::
+Signal.newClear(1024).waveFill({|x| (1 - x.pow(2)).pow(1.2047104)}, -1.0, 1.0).plot;
+::
+
+Overlap of 4 uses a Hann window on both sides of the FFT.
 
 argument::amp
 
@@ -107,13 +119,18 @@ Will start an NRT server, load the file, and execute the time stretch. Each inst
 code::
 
 //The new sound file will go into the default recordings directory in SC
-TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 10);
+TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 100);
 
 //If the above throws an error, you may need to increase the default Server memory allocation when using multiple FFT layers. If so, run the following before running the above line of code
 Server.local.options.memSize = 16384;
 
+
+//you can experiment with using a sine envelope or a classic paulstretch envelope before and after the fft
+TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, 2, 9, 1); //1 is the paulstretch envelope
+
+
 //One can also give different overlap settings per stretch band
-TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 10, 65536, [2,2,2,2,2,2,2,4,4]);
+TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, [2,2,2,2,2,2,2,4,4]);
 
 ::
 
@@ -121,27 +138,10 @@ Using the numSplits argument:
 
 code::
 
-//the NRT version will work with mono, stereo, or even N channel files
+//will work with mono, stereo, or even N channel files
 
-TimeStretch.stretchNRT(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10d.wav", 10, numSplits:4);
+TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10d.wav", 10, numSplits:4);
 ::
 
-A real-time version, with 1 FFT layer (which is basically a PaulStretch algorithm). This will only work on mono files.
 
-code::
-s.boot;
-
-b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
-
-TimeStretch.stretchRT1(s, b, 0, 0, 100, 2, 0.5, 32768/4);  //must be a mono file
-TimeStretch.stop
-::
-
-A real-time version with many FFT Layers (likely to overload the CPU):
-
-code::
-s.options.memSize = 16384; s.reboot;
-b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
-TimeStretch.stretchRT(s, b, 0, 0, 100, 4, 0.5, 32768/2, 4); //must be a mono file
-::
 
