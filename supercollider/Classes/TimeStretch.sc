@@ -18,7 +18,7 @@ TimeStretch {
 			SynthDef(\pb_monoStretch_Overlap4, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1|
 				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv;
 				trigPeriod = (fftSize/SampleRate.ir);
-				trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
+				//trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
 				trig = Impulse.ar(1/trigPeriod);
 
 				totFrames = (BufFrames.kr(bufnum)/fftSize*stretch);
@@ -30,7 +30,7 @@ TimeStretch {
 
 				pos = [pos, pos + jump, pos + (2*jump), pos + (3*jump)];
 
-				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*trigEnv;
+				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1);//*trigEnv;
 
 				//sig = GrainBuf.ar(1, trig, trigPeriod, bufnum, 1, pos, envbufnum: -1);
 				sig = sig.collect({ |item, i|
@@ -53,7 +53,7 @@ TimeStretch {
 			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1, wintype = 0|
 				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv;
 				trigPeriod = (fftSize/SampleRate.ir);
-				trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
+				//trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
 				trig = Impulse.ar(1/trigPeriod);
 
 				totFrames = (BufFrames.kr(bufnum)/fftSize*stretch);
