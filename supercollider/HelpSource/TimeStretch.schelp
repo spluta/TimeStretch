@@ -129,10 +129,11 @@ Server.local.options.memSize = 16384;
 
 
 //you can experiment with using a sine envelope or a classic paulstretch envelope before and after the fft
-TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, 2, 9, 1); //1 is the paulstretch envelope
+TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, 2, 9, 1); //1 is the classic paulstretch envelope
 
 
 //One can also give different overlap settings per stretch band
+//I think the best results come from [2,2,2,2,2,2,2,4,4] with a classic paulstretch envelope for the 2 overlaps
 TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, [2,2,2,2,2,2,2,4,4]);
 
 ::

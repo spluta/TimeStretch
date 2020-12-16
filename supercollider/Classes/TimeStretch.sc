@@ -47,7 +47,7 @@ TimeStretch {
 				sig[1] = DelayC.ar(sig[1], trigPeriod/4, trigPeriod/4);
 				sig[2] = DelayC.ar(sig[2], trigPeriod/2, trigPeriod/2);
 				sig[3] = DelayC.ar(sig[3], 3*trigPeriod/4, 3*trigPeriod/4);
-				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.375);
+				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.5);
 			}).writeDefFile;
 
 			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1, wintype = 0|
