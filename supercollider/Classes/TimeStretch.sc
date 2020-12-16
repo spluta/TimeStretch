@@ -47,7 +47,7 @@ TimeStretch {
 				sig[1] = DelayC.ar(sig[1], trigPeriod/4, trigPeriod/4);
 				sig[2] = DelayC.ar(sig[2], trigPeriod/2, trigPeriod/2);
 				sig[3] = DelayC.ar(sig[3], 3*trigPeriod/4, 3*trigPeriod/4);
-				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.5);
+				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.375);
 			}).writeDefFile;
 
 			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1, wintype = 0|
@@ -97,7 +97,7 @@ TimeStretch {
 		}
 	}
 
-	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 2, amp = 1, action, verbosity=0|
+	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 1, amp = 1, action, verbosity=0|
 		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat;
 
 		action ?? {action = {"done stretchin!".postln}};
@@ -109,6 +109,14 @@ TimeStretch {
 		};
 
 		overlaps.postln;
+
+		if(wintype.size==0){
+			wintype = Array.fill(numSplits, {wintype})
+		}{
+			if(wintype.size<numSplits){(numSplits-wintype.size).do{wintype = wintype.add(wintype.last)}}
+		};
+
+		wintype.postln;
 
 		inFile = PathName(inFile);
 		if((inFile.extension=="wav")||(inFile.extension=="aif")){
@@ -178,7 +186,7 @@ TimeStretch {
 				{overlaps.put(i, 4)}
 			);
 
-			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i], fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype, \amp, amp])])
+			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i], fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i].postln, \amp, amp])])
 		};
 		^nrtJam
 	}
