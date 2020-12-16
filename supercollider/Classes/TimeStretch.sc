@@ -51,7 +51,7 @@ TimeStretch {
 			}).writeDefFile;
 
 			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1, wintype = 0|
-				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv;
+				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv, paulEnv;
 				trigPeriod = (fftSize/SampleRate.ir);
 				//trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
 				trig = Impulse.ar(1/trigPeriod);
@@ -65,10 +65,13 @@ TimeStretch {
 
 				pos = [pos, pos + jump];
 
-				trigEnv = Select.ar(wintype, [SinOsc.ar(1/(2*trigPeriod)), 1-(Slew.ar(
+				paulEnv = 1-(Slew.ar(
 					1-Trig1.ar(trig, fftSize/2/SampleRate.ir),
 					SampleRate.ir/(fftSize/2),
-					SampleRate.ir/(fftSize/2))**2)**1.2047104]);
+					SampleRate.ir/(fftSize/2))**2);
+
+				trigEnv = Select.ar(wintype,
+					[SinOsc.ar(1/(2*trigPeriod)), paulEnv**1.25, paulEnv**1.2047104]);
 
 				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*trigEnv;
 
@@ -82,7 +85,9 @@ TimeStretch {
 				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate, doneAction:2);
 
 				sig = DelayC.ar(sig*bigEnv*amp, fftMax-fftSize/SampleRate.ir, fftMax-fftSize/SampleRate.ir);
-				trigEnv = Select.ar(wintype, [K2A.ar(1), DelayC.ar(trigEnv, fftMax-fftSize-BlockSize.ir/SampleRate.ir, fftMax-fftSize-BlockSize.ir/SampleRate.ir)]);
+
+				trigEnv = DelayC.ar(trigEnv, fftMax-fftSize-BlockSize.ir/SampleRate.ir, fftMax-fftSize-BlockSize.ir/SampleRate.ir);
+				trigEnv = Select.ar(wintype, [K2A.ar(1), trigEnv, trigEnv]);
 				sig = sig*trigEnv;
 
 				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);
@@ -92,7 +97,7 @@ TimeStretch {
 		}
 	}
 
-	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 0, amp = 1, action, verbosity=0|
+	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 2, amp = 1, action, verbosity=0|
 		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat;
 
 		action ?? {action = {"done stretchin!".postln}};

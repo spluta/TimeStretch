@@ -60,12 +60,15 @@ argument::numSplits
 
 argument::wintype
 
-Choose between the default SuperCollider sine window (0) and the classic paulstretch window (1).
+Choose between the default SuperCollider sine window (0) and the classic paulstretch window (1) and a version of the paulstretch window that has a flatter overlap (2).
 
-Sine wave is default, but the classic paulstretch window uses the following shape:
+The difference between 1 and 2 is subtle at best. The classic window has "more character." The new window is "cleaner."
+
+here is a comparison between the classic paulstretch window and the revised one
 
 code::
-Signal.newClear(1024).waveFill({|x| (1 - x.pow(2)).pow(1.2047104)}, -1.0, 1.0).plot;
+Signal.newClear(1024).waveFill({|x| (1 - x.pow(2)).pow(1.25)}, -1.0, 1.0).plot; //fclassic paulstretch - full of character
+Signal.newClear(1024).waveFill({|x| (1 - x.pow(2)).pow(1.2047104)}, -1.0, 1.0).plot; //flatter overlap - cleaner
 ::
 
 Overlap of 4 uses a Hann window on both sides of the FFT.
