@@ -8,7 +8,7 @@ NRT_Server_ID {
 TimeStretch {
 	classvar synths;
 	//by Sam Pluta - sampluta.com
-	// Based on the Alex Ness's NessStretch algorith in Python
+	// Based on the Alex Ness's NessStretch algorithm in Python
 	// thanks to Jean-Philippe Drecourt for his implementation of Paul Stretch, which was a huge influence on this code
 
 	*initClass {
@@ -50,7 +50,7 @@ TimeStretch {
 				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.375);
 			}).writeDefFile;
 
-			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1, wintype = 0|
+			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1, wintype = 1|
 				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv, paulEnv;
 				trigPeriod = (fftSize/SampleRate.ir);
 				//trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
@@ -191,40 +191,4 @@ TimeStretch {
 		^nrtJam
 	}
 
-	// *stretchRT1 { |target, bufferChan, outBus=0, pan=0, durMult=10, overlaps=2, startPos = 0, fftSize = 8192, amp = 1|
-	//
-	// 	switch(overlaps,
-	// 		2, {overlaps=2},
-	// 		3, {overlaps=3},
-	// 		{overlaps=4}
-	// 	);
-	//
-	// 	synths.add(Synth.new("pb_monoStretch_Overlap"++overlaps, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \startPos, startPos, \fftSize, fftSize, \fftMax, fftSize, \amp, amp, \gate, 1], target));
-	// }
-	//
-	// *stretchRT { |target, bufferChan, outBus=0, pan=0, durMult=10, overlaps=2, startPos = 0, fftMax = 32768, numSplits = 4, amp = 1|
-	// 	var filtVals, fftVals;
-	//
-	// 	switch(overlaps,
-	// 		2, {overlaps=2},
-	// 		3, {overlaps=3},
-	// 		{overlaps=4}
-	// 	);
-	//
-	// 	filtVals = List.fill(8, {|i| 1/2**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
-	//
-	// 	if((numSplits-1)<8){ filtVals = filtVals.copyRange(0, (numSplits-1))};
-	// 	filtVals.put(filtVals.size-1, [filtVals[filtVals.size-1][0], 1]);
-	//
-	// 	fftVals = List.fill(filtVals.size, {|i| fftMax/(2**i)});
-	//
-	// 	filtVals.do{|fv, i|
-	// 		synths.add(Synth.new("pb_monoStretch_Overlap"++overlaps, [\out, outBus, \bufnum, bufferChan, \pan, pan, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \startPos, startPos, \fftSize, fftVals[i], \fftMax, fftMax, \amp, amp, \gate, 1], target));
-	// 	}
-	// }
-	//
-	// *stop {
-	// 	synths.do{|synth| if(synth!=nil){synth.set(\gate, 0)}};
-	// 	synths = List.newClear(0);
-	// }
 }
