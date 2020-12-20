@@ -48,21 +48,21 @@ The largest FFT buffer size, for the lowest frequency data.
 
 argument::overlaps
 
-The default is 2, but 4 is also an option. 4 uses the default IFFT window. 2 uses the custom window defined by the PaulStretch algorithm.
+The default is 2, but 4 is also an option.
 
-If given a 2, 3, or 4, all of the FFT bands will use the same overlap. However, if the user gives an array of values, like [2,2,2,2,2,3,3,4,4], each band will have its own overlap setting.
+If given a 2, 4, all of the FFT bands will use the same overlap. However, if the user gives an array of values, like [2,2,2,2,2,2,2,4,4], each band will have its own overlap setting. This custom setting is quite nice, smoothing out the top end.
 
 argument::numSplits
 
-	By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below 22050, then subsequent octaves down from there, leaving everything below 86hz to the largest buffer. However, some material, like classical orchestral music, gets swimmy above a certain register (or the swimminess that is welcome in pop becomes unwelcome). Here you can set the split to 8 or lower. Setting the number to 7, for instance, leaves us with a top FFT dealing with the frequency range above 2756 with a bin size of 1024 rather the audio range above 11025 with a bin size of 256, which is the default.
+	By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below 22050, then subsequent octaves down from there, leaving everything below 86hz to the largest buffer. However, some material, like classical orchestral music, gets swimmy above a certain register (or the swimminess that is welcome in pop becomes unwelcome). Here you can set the split to 8 or lower. Setting the number to 7, for instance, leaves us with a top FFT dealing with the frequency range above 2756hz with a bin size of 1024 rather the audio range above 11025 with a bin size of 256, which is the default.
 
 	Simple answer: if it is swimmy, try a 8 or lower here. For string music, for instance, I found 4 to be best. A number above 9 will do nothing.
 
 argument::wintype
 
-Choose between the default SuperCollider sine window (0) and the classic paulstretch window (1) and a version of the paulstretch window that has a flatter overlap (2). wintype for an overlap of 4 will be a Hann window.
+Choose between the default (0) SuperCollider Sine window, (1) the classic paulstretch window (2) and a version of the paulstretch window that has a corrected equal power overlap. wintype for an overlap of 4 will always be a Sine window.
 
-Like overlaps, wintype can also be different in each frequency band, so [1,1,1,1,1,1,1,0,0] will resut in [paul,paul,paul,paul,paul,paul,paul,sine, sine]
+Like overlaps, wintype can also be different in each frequency band, so [1,1,1,1,1,1,1,0,0] will resut in [paul,paul,paul,paul,paul,paul,paul,sine, sine]. This feature is "experimental," as they say.
 
 argument::amp
 
@@ -72,59 +72,29 @@ argument::action
 
 A function to be evaluated when the process has completed. By default it will print "Done stretchin!"
 
-method::stretchRT
 
-argument::target
-
-A group or server
-
-argument::bufferChan
-
-A mono buffer to stretch
-
-argument::outBus
-
-The outbus.
-
-argument::pan
-
--1 to 1
-
-argument::durMult
-
-The multiple of the stretch.
-
-argument::overlaps
-
-The default is 2, but 4 is also an option. 2 might currently be broken in Real-Time.
-
-argument::startPos
-
-startPos in the file, from 0 to 1.
-
-argument::amp
-
-The amplitude. Default is 1.
 
 Examples::
 
-Will start an NRT server, load the file, and execute the time stretch. Each instance of this will run on its own server, so you can run as many simultaneously as your computer can handle.
+Will start an NRT server, load the file, and execute the time stretch. Each instance of TimeStretch will run on its own server, so you can run as many simultaneously as your computer can handle.
 
 code::
+
+//The new sound file will go into the default recordings directory in SC
+TimeStretch.stretch("Bieber", nil, 100);  //try it with Biebs
 
 //The new sound file will go into the default recordings directory in SC
 TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 100);
 
 //If the above throws an error, you may need to increase the default Server memory allocation when using multiple FFT layers. If so, run the following before running the above line of code
 Server.local.options.memSize = 16384;
+::
 
+One can also give different overlap settings per stretch band
+I think the best results come from [2,2,2,2,2,2,2,4,4] with a default sine envelope for the 2 overlaps
 
-//you can experiment with using a sine envelope or a classic paulstretch envelope before and after the fft
-TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, 2, 9, 1); //1 is the classic paulstretch envelope
+code::
 
-
-//One can also give different overlap settings per stretch band
-//I think the best results come from [2,2,2,2,2,2,2,4,4] with a classic paulstretch envelope for the 2 overlaps
 TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, [2,2,2,2,2,2,2,4,4]);
 
 ::
