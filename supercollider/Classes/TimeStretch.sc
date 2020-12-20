@@ -47,22 +47,21 @@ TimeStretch {
 				sig[1] = DelayC.ar(sig[1], trigPeriod/4, trigPeriod/4);
 				sig[2] = DelayC.ar(sig[2], trigPeriod/2, trigPeriod/2);
 				sig[3] = DelayC.ar(sig[3], 3*trigPeriod/4, 3*trigPeriod/4);
-				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.375);
+				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.45);
 			}).writeDefFile;
 
 			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1, wintype = 1|
-				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv, paulEnv;
+				var trigPeriod, sig, chain, trig, pos, posB, stretchDur, jump, env, extraDel, bigEnv, count, totFrames, fftBufs, trigEnv, paulEnv, rectEnv, winChoice0, winChoice1, noise, noiseChain, dist, equalPowerEnv, fftDelay;
+
 				trigPeriod = (fftSize/SampleRate.ir);
-				//trigEnv = EnvGen.ar(Env([0,0,1], [1,0]), 1);
 				trig = Impulse.ar(1/trigPeriod);
 
 				totFrames = (BufFrames.kr(bufnum)/fftSize*stretch);
 
-				jump = fftSize/stretch/2;
-
 				startPos = (startPos%1);
 				pos = Line.ar(startPos*BufFrames.kr(bufnum), BufFrames.kr(bufnum), BufDur.kr(bufnum)*stretch*(1-startPos));
 
+				jump = fftSize/stretch/2;
 				pos = [pos, pos + jump];
 
 				paulEnv = 1-(Slew.ar(
@@ -70,25 +69,32 @@ TimeStretch {
 					SampleRate.ir/(fftSize/2),
 					SampleRate.ir/(fftSize/2))**2);
 
-				trigEnv = Select.ar(wintype,
-					[SinOsc.ar(1/(2*trigPeriod)), paulEnv**1.25, paulEnv**1.2047104]);
+				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*SinOsc.ar(1/(2*trigPeriod)).abs;
 
-				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*trigEnv;
+				winChoice1 = Select.kr(wintype, [0, -1]);
+
+				//make it a crossfade
 
 				sig = sig.collect({ |item, i|
-					chain = FFT(LocalBuf(fftSize), item, hop: 1.0, wintype: wintype.neg);
+					chain = FFT(LocalBuf(fftSize), item, hop: 0.5, wintype: 0);
 					chain = PV_Diffuser(chain, 1-trig);
 					chain = PV_BrickWall(chain, hiPass);
 					chain = PV_BrickWall(chain, lowPass);
-					item = IFFT(chain, wintype: wintype.neg);
+					item = IFFT(chain, wintype: winChoice1);
 				});
+
 				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate, doneAction:2);
 
-				sig = DelayC.ar(sig*bigEnv*amp, fftMax-fftSize/SampleRate.ir, fftMax-fftSize/SampleRate.ir);
+				trigEnv = Select.ar(wintype,
+					[K2A.ar(1), paulEnv]);
 
-				trigEnv = DelayC.ar(trigEnv, fftMax-fftSize-BlockSize.ir/SampleRate.ir, fftMax-fftSize-BlockSize.ir/SampleRate.ir);
-				trigEnv = Select.ar(wintype, [K2A.ar(1), trigEnv, trigEnv]);
+				fftDelay = fftSize-BlockSize.ir/SampleRate.ir;
+
+				trigEnv = DelayC.ar(trigEnv, fftDelay, fftDelay);
+
 				sig = sig*trigEnv;
+
+				sig = DelayC.ar(sig*bigEnv*amp, fftMax-fftSize/SampleRate.ir, fftMax-fftSize/SampleRate.ir);
 
 				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);
 				Out.ar(out, Pan2.ar(Mix.new(sig), pan)/2);
@@ -97,7 +103,7 @@ TimeStretch {
 		}
 	}
 
-	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 1, amp = 1, action, verbosity=0|
+	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 1, distAmount = 0, amp = 1, action|
 		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat;
 
 		action ?? {action = {"done stretchin!".postln}};
@@ -106,6 +112,12 @@ TimeStretch {
 			overlaps = Array.fill(numSplits, {overlaps})
 		}{
 			if(overlaps.size<numSplits){(numSplits-overlaps.size).do{overlaps = overlaps.add(overlaps.last)}}
+		};
+
+		if(distAmount.size==0){
+			distAmount = Array.fill(numSplits, {overlaps})
+		}{
+			if(distAmount.size<numSplits){(numSplits-distAmount.size).do{distAmount = distAmount.add(distAmount.last)}}
 		};
 
 		overlaps.postln;
@@ -119,7 +131,7 @@ TimeStretch {
 		wintype.postln;
 
 		inFile = PathName(inFile);
-		if((inFile.extension=="wav")||(inFile.extension=="aif")){
+		if((inFile.extension=="wav")||(inFile.extension=="aif")||(inFile.extension=="aiff")){
 
 			sf = SoundFile.openRead(inFile.fullPath);
 
@@ -127,7 +139,7 @@ TimeStretch {
 
 			if(outFile == nil){outFile = PathName(inFile).pathOnly++PathName(outFile).fileNameWithoutExtension++durMult++".wav"};
 
-			Server.local.options.verbosity_(verbosity);
+			//Server.local.options.verbosity_(verbosity);
 
 			server = Server(("nrt"++NRT_Server_ID.next).asSymbol,
 				options: Server.local.options
@@ -154,9 +166,9 @@ TimeStretch {
 
 			nrtJam = Score.new();
 
-			nrtJam = this.addBundles(nrtJam, server, inFile, buffer0, 0, durMult, overlaps, -1, amp, filtVals, fftVals, fftMax, wintype);
+			nrtJam = this.addBundles(nrtJam, server, inFile, buffer0, 0, durMult, overlaps, -1, amp, filtVals, fftVals, fftMax, wintype, distAmount);
 			if(numChans>1){
-				nrtJam = this.addBundles(nrtJam, server, inFile, buffer1, 1, durMult, overlaps, 1, amp, filtVals, fftVals, fftMax, wintype);
+				nrtJam = this.addBundles(nrtJam, server, inFile, buffer1, 1, durMult, overlaps, 1, amp, filtVals, fftVals, fftMax, wintype, distAmount);
 			};
 
 			if((sf.duration*sf.numChannels*durMult)<(8*60*60)){headerFormat="wav"}{
@@ -177,7 +189,7 @@ TimeStretch {
 		}{"Not an audio file!".postln;}
 	}
 
-	*addBundles {|nrtJam, server, inFile, buffer, chanNum, durMult, overlaps, pan, amp, filtVals, fftVals, fftMax, wintype|
+	*addBundles {|nrtJam, server, inFile, buffer, chanNum, durMult, overlaps, pan, amp, filtVals, fftVals, fftMax, wintype, distAmount|
 
 		nrtJam.add([0.0, buffer.allocReadChannelMsg(inFile.fullPath, 0, -1, [chanNum])]);
 		filtVals.do{|fv, i|
@@ -186,7 +198,7 @@ TimeStretch {
 				{overlaps.put(i, 4)}
 			);
 
-			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i], fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i].postln, \amp, amp])])
+			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i], fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i].postln, \distAmount, distAmount, \amp, amp])])
 		};
 		^nrtJam
 	}
