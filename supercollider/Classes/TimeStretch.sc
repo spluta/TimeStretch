@@ -50,7 +50,7 @@ TimeStretch {
 				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.5*bigEnv);
 			}).writeDefFile;
 
-			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, wintype = 1, amp = 1, gate = 1, sinePower = 1.1|
+			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, wintype = 1, amp = 1, gate = 1, winExp = 1.2|
 				var trigPeriod, sig, chain, trig, pos, jump, totFrames, trigEnv, fftDelay, paulEnv, winChoice, bigEnv, warp;
 
 				trigPeriod = (fftSize/SampleRate.ir);
@@ -71,7 +71,7 @@ TimeStretch {
 
 				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*SinOsc.ar(1/(2*trigPeriod)).abs;
 
-				winChoice = Select.kr(wintype, [0, -1, 0]);
+				winChoice = Select.kr(wintype, [0, 0, -1]);
 
 				sig = sig.collect({ |item, i|
 					chain = FFT(LocalBuf(fftSize), item, hop: 0.5, wintype: 0);
@@ -81,10 +81,10 @@ TimeStretch {
 					item = IFFT(chain, wintype: winChoice);
 				});
 
-				warp = (SinOsc.ar(1/(2*trigPeriod))**(sinePower-1)).abs;
+				warp = (SinOsc.ar(1/(2*trigPeriod))**(winExp-1)).abs;
 
 				trigEnv = Select.ar(wintype,
-					[K2A.ar(1), paulEnv**1.25, warp]);
+					[warp, K2A.ar(1), paulEnv**1.25]);
 
 				fftDelay = fftSize-BlockSize.ir/SampleRate.ir;
 				trigEnv = DelayC.ar(trigEnv, fftDelay, fftDelay);
@@ -101,7 +101,7 @@ TimeStretch {
 		}
 	}
 
-	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 0, sinePower=1.1, amp = 1, action|
+	*stretch { |inFile, outFile, durMult, fftMax = 65536, overlaps = 2, numSplits = 9, wintype = 0, winExp=1.1, amp = 1, action|
 		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat;
 
 		action ?? {action = {"done stretchin!".postln}};
@@ -116,6 +116,12 @@ TimeStretch {
 			wintype = Array.fill(numSplits, {wintype})
 		}{
 			if(wintype.size<numSplits){(numSplits-wintype.size).do{wintype = wintype.add(wintype.last)}}
+		};
+
+		if(winExp.size==0){
+			winExp = Array.fill(numSplits, {winExp})
+		}{
+			if(winExp.size<numSplits){(numSplits-winExp.size).do{winExp = winExp.add(winExp.last)}}
 		};
 
 		inFile = PathName(inFile);
@@ -154,9 +160,9 @@ TimeStretch {
 
 			nrtJam = Score.new();
 
-			nrtJam = this.addBundles(nrtJam, server, inFile, buffer0, 0, durMult, overlaps, -1, amp, filtVals, fftVals, fftMax, wintype, sinePower);
+			nrtJam = this.addBundles(nrtJam, server, inFile, buffer0, 0, durMult, overlaps, -1, amp, filtVals, fftVals, fftMax, wintype, winExp);
 			if(numChans>1){
-				nrtJam = this.addBundles(nrtJam, server, inFile, buffer1, 1, durMult, overlaps, 1, amp, filtVals, fftVals, fftMax, wintype, sinePower);
+				nrtJam = this.addBundles(nrtJam, server, inFile, buffer1, 1, durMult, overlaps, 1, amp, filtVals, fftVals, fftMax, wintype, winExp);
 			};
 
 			if((sf.duration*sf.numChannels*durMult)<(8*60*60)){headerFormat="wav"}{
@@ -178,7 +184,7 @@ TimeStretch {
 		}{"Not an audio file!".postln;}
 	}
 
-	*addBundles {|nrtJam, server, inFile, buffer, chanNum, durMult, overlaps, pan, amp, filtVals, fftVals, fftMax, wintype, sinePower|
+	*addBundles {|nrtJam, server, inFile, buffer, chanNum, durMult, overlaps, pan, amp, filtVals, fftVals, fftMax, wintype, winExp|
 
 		nrtJam.add([0.0, buffer.allocReadChannelMsg(inFile.fullPath, 0, -1, [chanNum])]);
 		filtVals.do{|fv, i|
@@ -187,7 +193,7 @@ TimeStretch {
 				{overlaps.put(i, 4)}
 			);
 
-			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i], fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i],\amp, amp, \sinePower, sinePower])])
+			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i],\amp, amp, \winExp, winExp[i].postln])])
 		};
 		^nrtJam
 	}
