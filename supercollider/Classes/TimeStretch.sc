@@ -112,15 +112,11 @@ TimeStretch {
 			if(overlaps.size<numSplits){(numSplits-overlaps.size).do{overlaps = overlaps.add(overlaps.last)}}
 		};
 
-		overlaps.postln;
-
 		if(wintype.size==0){
 			wintype = Array.fill(numSplits, {wintype})
 		}{
 			if(wintype.size<numSplits){(numSplits-wintype.size).do{wintype = wintype.add(wintype.last)}}
 		};
-
-		wintype.postln;
 
 		inFile = PathName(inFile);
 		if((inFile.extension=="wav")||(inFile.extension=="aif")||(inFile.extension=="aiff")){
@@ -168,7 +164,6 @@ TimeStretch {
 				outFile = PathName(outFile).pathOnly++PathName(outFile).fileNameWithoutExtension++".caf";
 			};
 
-			outFile.postln;
 
 			nrtJam.recordNRT(
 				outputFilePath: outFile.standardizePath,
@@ -192,7 +187,7 @@ TimeStretch {
 				{overlaps.put(i, 4)}
 			);
 
-			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i], fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i].postln,\amp, amp, \sinePower, sinePower])])
+			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i], fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i],\amp, amp, \sinePower, sinePower])])
 		};
 		^nrtJam
 	}
