@@ -60,9 +60,13 @@ argument::numSplits
 
 argument::wintype
 
-Choose between the default (0) SuperCollider Sine window, (1) the classic paulstretch window (2) and a version of the paulstretch window that has a corrected equal power overlap. wintype for an overlap of 4 will always be a Sine window.
+Choose between the default (0) SuperCollider Sine window, (1) the classic paulstretch window (2) and warped sine wave that is a sine wave. wintype for an overlap of 4 will always be a Sine window.
 
 Like overlaps, wintype can also be different in each frequency band, so [1,1,1,1,1,1,1,0,0] will resut in [paul,paul,paul,paul,paul,paul,paul,sine, sine]. This feature is "experimental," as they say.
+
+argument::sinePower
+
+An argument used in collaboration with wintype 3. This will warp the sine wave by a power of this value. Thus the window will be a sine^sinePower instead of just a sine. Default is 1.1.
 
 argument::amp
 
