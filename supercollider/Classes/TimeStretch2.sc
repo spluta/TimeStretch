@@ -1,11 +1,5 @@
-NRT_Server_ID {
-	classvar <id=5000;
-	*initClass { id = 5000; }
-	*next  { ^id = id + 1; }
-	*path {this.filenameSymbol.postln}
-}
 
-TimeStretch {
+TimeStretch2 {
 	classvar synths;
 	//by Sam Pluta - sampluta.com
 	// Based on the Alex Ness's NessStretch algorithm in Python
@@ -15,43 +9,8 @@ TimeStretch {
 		synths = List.newClear(0);
 		StartUp.add {
 
-			SynthDef(\pb_monoStretch_Overlap4, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1|
-				var trigPeriod, sig, chain, trig, pos, jump, totFrames, trigEnv, bigEnv;
-
-				trigPeriod = (fftSize/SampleRate.ir);
-				trig = Impulse.ar(1/trigPeriod);
-
-				totFrames = (BufFrames.kr(bufnum)/fftSize*stretch);
-
-				jump = fftSize/stretch/4;
-
-				startPos = (startPos%1);
-				pos = Line.ar(startPos*BufFrames.kr(bufnum), BufFrames.kr(bufnum), BufDur.kr(bufnum)*stretch*(1-startPos));
-
-				pos = [pos, pos + jump, pos + (2*jump), pos + (3*jump)];
-
-				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*SinOsc.ar(1/(2*trigPeriod)).abs;
-
-				sig = sig.collect({ |item, i|
-					chain = FFT(LocalBuf(fftSize), item, hop: 1.0, wintype: 0);
-					chain = PV_Diffuser(chain, 1-trig);
-					chain = PV_BrickWall(chain, hiPass);
-					chain = PV_BrickWall(chain, lowPass);
-					item = IFFT(chain, 0);
-				});
-
-				sig = DelayC.ar(sig*amp, fftMax-fftSize/SampleRate.ir, fftMax-fftSize/SampleRate.ir);
-
-				sig[1] = DelayC.ar(sig[1], trigPeriod/4, trigPeriod/4);
-				sig[2] = DelayC.ar(sig[2], trigPeriod/2, trigPeriod/2);
-				sig[3] = DelayC.ar(sig[3], 3*trigPeriod/4, 3*trigPeriod/4);
-
-				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate, doneAction:2);
-				Out.ar(out, Pan2.ar(Mix.new(sig), pan)*0.5*bigEnv);
-			}).writeDefFile;
-
-			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, wintype = 1, amp = 1, gate = 1, winExp = 1.2|
-				var trigPeriod, sig, chain, trig, pos, jump, totFrames, trigEnv, fftDelay, paulEnv, winChoice, bigEnv, warp;
+			SynthDef(\wn_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, wintype = 1, amp = 1, gate = 1, winExp = 1.2|
+				var trigPeriod, sig, chain, chainA, chainB, trig, pos, jump, totFrames, trigEnv, fftDelay, paulEnv, winChoice, bigEnv, warp, noise;
 
 				trigPeriod = (fftSize/SampleRate.ir);
 				trig = Impulse.ar(1/trigPeriod);
@@ -67,34 +26,40 @@ TimeStretch {
 				paulEnv = 1-(Slew.ar(
 					1-Trig1.ar(trig, fftSize/2/SampleRate.ir),
 					SampleRate.ir/(fftSize/2),
-					SampleRate.ir/(fftSize/2))**2).lincurve;
+					SampleRate.ir/(fftSize/2))**2);
 
 				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*SinOsc.ar(1/(2*trigPeriod)).abs;
 
 				winChoice = Select.kr(wintype, [0, 0, -1]);
 
+				noise = [WhiteNoise.ar(0.05), WhiteNoise.ar(0.05)];
+
 				sig = sig.collect({ |item, i|
-					chain = FFT(LocalBuf(fftSize), item, hop: 0.5, wintype: 0);
-					chain = PV_Diffuser(chain, 1-trig);
+					chainA = FFT(LocalBuf(fftSize), item, 0.5, 0, 1, fftSize/2);
+					chainB = FFT(LocalBuf(fftSize), noise[i], 0.5, 0, 1, fftSize/2);
+    chain = PV_Mul(chainA, chainB);
+    Out.ar(out,  0.1 * IFFT(chain).dup);
+					chain = PV_Mul(chainA, chainB);
+					//chain = PV_Diffuser(chain, 1-trig);
 					chain = PV_BrickWall(chain, hiPass);
 					chain = PV_BrickWall(chain, lowPass);
-					item = IFFT(chain, wintype: winChoice);
+					item = IFFT(chain, wintype: 0);
 				});
 
-				warp = (SinOsc.ar(1/(2*trigPeriod))**(winExp-1)).abs.clip(0.001, 1);
+				warp = (SinOsc.ar(1/(2*trigPeriod))**(winExp-1)).abs;
 
 				trigEnv = Select.ar(wintype,
 					[warp, K2A.ar(1), paulEnv**1.25]);
 
-				fftDelay = fftSize-BlockSize.ir/SampleRate.ir;
-				trigEnv = DelayC.ar(trigEnv, fftDelay, fftDelay);
-				sig = sig*trigEnv;
+				//fftDelay = fftSize-BlockSize.ir/SampleRate.ir;
+				//trigEnv = DelayC.ar(trigEnv, fftDelay, fftDelay);
+				//sig = sig*trigEnv;
 
 				sig = DelayC.ar(sig*amp, fftMax-fftSize/SampleRate.ir, fftMax-fftSize/SampleRate.ir);
 
 				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);
 
-				bigEnv = EnvGen.kr(Env.asr(0,1,0), gate, doneAction:2);
+				bigEnv = EnvGen.kr(Env.asr(0,0.1,0), gate, doneAction:2);
 				Out.ar(out, Pan2.ar(Mix.new(sig), pan)/2*bigEnv);
 			}).writeDefFile;
 
@@ -193,7 +158,7 @@ TimeStretch {
 				{overlaps.put(i, 4)}
 			);
 
-			nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i],\amp, amp, \winExp, winExp[i].postln])])
+			nrtJam.add([0.0, Synth.basicNew(("wn_monoStretch_Overlap"++overlaps[i]), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0], \lowPass, fv[1]-1, \wintype, wintype[i],\amp, amp, \winExp, winExp[i].postln])])
 		};
 		^nrtJam
 	}
