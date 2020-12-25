@@ -60,13 +60,13 @@ argument::numSplits
 
 argument::wintype
 
-For the envelope over the IFFT, choose between the default (0) warped sine wave that is a sine wave to an exponential power provided by the winExp argument (1) a straight SuperCollider Sine window, and (2) the classic paulstretch window. Default is 0 to the power of 1.25.
+For the envelope over the IFFT, choose between the default (0) sine wave to an exponential power provided by the winExp argument or (1) the classic paulstretch window.
 
 wintype for an overlap of 4 will always be a Sine window.
 
 argument::winExp
 
-An argument used in collaboration with wintype 0 only. This will warp the sine wave envelope over the IFFT window by a power of this value. Thus the window will be a sine^winExp instead of just a sine. Default is 1.25.
+An argument used in collaboration with wintype 0 only. This will warp the sine wave envelope over the IFFT window by a power of this value. Thus the window will be a sine^winExp instead of just a sine. Default is 1.25. It can also be an array. Array.series(9, 1.25, -0.01) is a recommended value.
 
 argument::amp
 

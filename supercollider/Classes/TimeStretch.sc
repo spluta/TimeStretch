@@ -16,12 +16,10 @@ TimeStretch {
 		StartUp.add {
 
 			SynthDef(\pb_monoStretch_Overlap4, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1|
-				var trigPeriod, sig, chain, trig, pos, jump, totFrames, trigEnv, bigEnv;
+				var trigPeriod, sig, chain, trig, pos, jump, trigEnv, bigEnv;
 
 				trigPeriod = (fftSize/SampleRate.ir);
 				trig = Impulse.ar(1/trigPeriod);
-
-				totFrames = (BufFrames.kr(bufnum)/fftSize*stretch);
 
 				jump = fftSize/stretch/4;
 
@@ -51,12 +49,10 @@ TimeStretch {
 			}).writeDefFile;
 
 			SynthDef(\pb_monoStretch_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 12, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, wintype = 1, amp = 1, gate = 1, winExp = 1.2|
-				var trigPeriod, sig, chain, trig, pos, jump, totFrames, trigEnv, fftDelay, paulEnv, winChoice, bigEnv, warp;
+				var trigPeriod, sig, chain, trig, pos, jump, trigEnv, fftDelay, paulEnv, winChoice, bigEnv, warp;
 
 				trigPeriod = (fftSize/SampleRate.ir);
 				trig = Impulse.ar(1/trigPeriod);
-
-				totFrames = (BufFrames.kr(bufnum)/fftSize*stretch);
 
 				startPos = (startPos%1);
 				pos = Line.ar(startPos*BufFrames.kr(bufnum), BufFrames.kr(bufnum), BufDur.kr(bufnum)*stretch*(1-startPos));
@@ -64,17 +60,17 @@ TimeStretch {
 				jump = fftSize/stretch/2;
 				pos = [pos, pos + jump];
 
-				paulEnv = 1-(Slew.ar(
+				paulEnv = (1-(Slew.ar(
 					1-Trig1.ar(trig, fftSize/2/SampleRate.ir),
 					SampleRate.ir/(fftSize/2),
-					SampleRate.ir/(fftSize/2))**2).lincurve;
+					SampleRate.ir/(fftSize/2))**2))**1.25;
 
 				sig = PlayBuf.ar(1, bufnum, 1, trig, pos, 1)*SinOsc.ar(1/(2*trigPeriod)).abs;
 
-				winChoice = Select.kr(wintype, [0, 0, -1]);
+				winChoice = Select.kr(wintype, [0, -1]);
 
 				sig = sig.collect({ |item, i|
-					chain = FFT(LocalBuf(fftSize), item, hop: 0.5, wintype: 0);
+					chain = FFT(LocalBuf(fftSize), item, hop: 1.0, wintype: 0);
 					chain = PV_Diffuser(chain, 1-trig);
 					chain = PV_BrickWall(chain, hiPass);
 					chain = PV_BrickWall(chain, lowPass);
@@ -84,7 +80,7 @@ TimeStretch {
 				warp = (SinOsc.ar(1/(2*trigPeriod))**(winExp-1)).abs.clip(0.001, 1);
 
 				trigEnv = Select.ar(wintype,
-					[warp, K2A.ar(1), paulEnv**1.25]);
+					[warp, paulEnv]);
 
 				fftDelay = fftSize-BlockSize.ir/SampleRate.ir;
 				trigEnv = DelayC.ar(trigEnv, fftDelay, fftDelay);
