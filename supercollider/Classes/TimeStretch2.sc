@@ -100,8 +100,8 @@ TimeStretch2 {
 				hiPass = hiPass*SampleRate.ir/2;
 				lowPass = lowPass*SampleRate.ir/2;
 
-				sig = HPF.ar(HPF.ar(sig, (hiPass).clip(20, SampleRate.ir/2)), (hiPass).clip(20, SampleRate.ir/2));
-				sig = LPF.ar(LPF.ar(sig, (lowPass).clip(20, SampleRate.ir/2)), (lowPass).clip(20, SampleRate.ir/2));
+				outSig = HPF.ar(HPF.ar(outSig, (hiPass).clip(20, SampleRate.ir/2)), (hiPass).clip(20, SampleRate.ir/2));
+				outSig = LPF.ar(LPF.ar(outSig, (lowPass).clip(20, SampleRate.ir/2)), (lowPass).clip(20, SampleRate.ir/2));
 
 
 				Out.ar(out, Pan2.ar(Mix.new(outSig), pan)/2*bigEnv*amp);
