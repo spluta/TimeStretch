@@ -3,7 +3,9 @@
 Python implementation of the NessStretch algorithm.
 
 ## Requirements
+
 Requires numpy, scipy, and pandas. Using `virtualenv`:
+
 ```
 virtualenv .env
 . .env/bin/activate
@@ -11,7 +13,9 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+
 See usage options with the `-h` option:
+
 ```
 ./nessstretch.py -h
 
