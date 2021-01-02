@@ -7,76 +7,147 @@
 #
 # Licence: CC BY-SA 3.0 US
 
-from functools import reduce
 from os.path import join
+import logging as log
+import rwindow
 import numpy as np
-import scipy.interpolate
 import scipy.io.wavfile
 import scipy.signal
 import sys
 
-fancy_bands = {
-    256: (65, 129),
-    512: (65, 129),
-    1024: (65, 129),
-    2048: (65, 129),
-    4096: (65, 129),
-    8192: (65, 129),
-    16384: (65, 129),
-    32768: (65, 129),
-    65536: (0, 129),
-    }
+def p2r(radii, angles):
+    '''Complex polar to rectangular'''
+    return radii * np.exp(1j*angles)
 
-    
+def r2p(x):
+    '''Complex rectangular to polar'''
+    return np.abs(x), np.angle(x)
+
 class AnalysisBand(object):
-    def __init__(self, nfft=None, overlap=None, window=None):
+    def __init__(self, nfft, low_bin, high_bin_plus_1, synthesis_window, phase_mode, nonnegative_phases):
+        # analysis variables
         self.nfft = nfft
         self.nrfft = nfft // 2 + 1
-        self.overlap = overlap
-        self.hop_size = nfft // overlap
-        self.window = window
-        self.window_array = scipy.signal.get_window(window, nfft)
-        self.low_bin, self.high_bin = fancy_bands[nfft]
-        self.bins = self.high_bin - self.low_bin
-
-    def bandpass_filter_impulse(self):
-        return np.concatenate([np.zeros(self.low_bin), np.ones(self.bins), np.zeros(self.nrfft - self.high_bin)])
-
-    def white_noise_filter_impulse(self):
-        phases = np.random.uniform(0, 2 * np.pi, self.bins) * 1j
-        return np.concatenate([np.zeros(self.low_bin), np.exp(phases), np.zeros(self.nrfft - self.high_bin)])
-    
-    def process_frame(self, padded_input_signal, current_input_time, current_output_time, mix_bus, randomize_phases):
-        analysis_frame = padded_input_signal[int(current_input_time) : int(current_input_time) + self.nfft] * self.window_array
-        rfft = np.fft.rfft(analysis_frame)
-        if randomize_phases:
-            amplitudes = np.abs(rfft)
-            bandpass_frame = amplitudes * self.white_noise_filter_impulse()
+        self.overlap = 2
+        self.hop_size = nfft // 2
+        # windowing
+        self.analysis_window_array = scipy.signal.get_window('hann', nfft)
+        self.synthesis_window = synthesis_window
+        if self.synthesis_window in rwindow.variable_window_funcs.keys():
+            self.variable_window = True
+            window_func = rwindow.variable_window_funcs[synthesis_window]
+            self.xfade_table = window_func(self.hop_size)
+            self.xfade_buffer = None
         else:
-            bandpass_frame = rfft * self.bandpass_filter_impulse()       
-        frame_output = scipy.fft.irfft(bandpass_frame) * self.window_array
-        mix_bus[int(current_output_time) : int(current_output_time) + self.nfft] += frame_output
+            self.variable_window = False
+            self.synthesis_window_array = scipy.signal.get_window(self.synthesis_window, nfft)
+        # bandpass bins
+        self.low_bin = low_bin
+        self.high_bin_plus_1 = high_bin_plus_1
+        self.bins = self.high_bin_plus_1 - self.low_bin
+        # phase
+        self.phase_mode = phase_mode
+        if self.phase_mode == 'interpolate':
+            self.previous_input_phases = None
+            self.output_phases = None
+        self.nonnegative_phases = nonnegative_phases
+        # phase correlation statistics
+        self.r_sum = 0
+        self.r_sum_abs = 0
+        self.r_inverted = 0
     
-    def stretch(self, input_signal, playback_rate, mix_bus, randomize_phases):
-        padded_input_signal = np.concatenate([np.zeros(self.nfft//2), input_signal, np.zeros(self.nfft//2)])
+    def pad_bandpass_frame(self, processed_bins):
+        return np.concatenate([
+            np.zeros(self.low_bin),
+            processed_bins,
+            np.zeros(self.nrfft - self.high_bin_plus_1)
+        ])
+
+    def random_phases(self):
+        return np.random.uniform(0, 2*np.pi, self.bins)
+
+    def process_frame(self, padded_input_signal, current_input_time, current_output_time, mix_bus, playback_rate):
+        analysis_frame = padded_input_signal[int(current_input_time) : int(current_input_time) + self.nfft] * self.analysis_window_array
+        rfft = np.fft.rfft(analysis_frame)
+        
+        if self.phase_mode == 'randomize':
+            amplitudes = np.abs(rfft)
+            amplitudes_bandpass = amplitudes[self.low_bin : self.high_bin_plus_1]
+            complex_phases = np.exp(self.random_phases() * 1j)
+            bandpass_frame = self.pad_bandpass_frame(amplitudes_bandpass * complex_phases)
+        elif self.phase_mode == 'interpolate':
+            amplitudes, input_phases = r2p(rfft)
+            amplitudes_bandpass = amplitudes[self.low_bin : self.high_bin_plus_1]
+            input_phases_bandpass = input_phases[self.low_bin : self.high_bin_plus_1]
+            if self.output_phases is None:
+                self.output_phases = self.random_phases()
+            else:
+                input_phase_diffs = (input_phases_bandpass - self.previous_input_phases) % (2*np.pi)
+                output_phase_diffs = (input_phase_diffs / playback_rate) % (2*np.pi)
+                self.output_phases = (self.output_phases + output_phase_diffs) % (2*np.pi)
+            bandpass_frame = self.pad_bandpass_frame(p2r(amplitudes_bandpass, self.output_phases))
+            self.previous_input_phases = input_phases_bandpass
+        else: # self.phase_mode == 'keep'
+            bandpass_frame = self.pad_bandpass_frame(rfft[self.low_bin : self.high_bin_plus_1])
+
+        ifft = scipy.fft.irfft(bandpass_frame)
+        
+        if self.variable_window:
+            ifft_l, ifft_r = ifft[:self.hop_size], ifft[self.hop_size:]
+            if self.xfade_buffer is None:
+                self.xfade_buffer = np.zeros(self.hop_size)
+                r = 0
+            else:
+                r = np.corrcoef(ifft_l, self.xfade_buffer)[0,1]
+            if np.isnan(r):
+                r = 1
+            self.r_sum += r
+            if self.nonnegative_phases and r < 0:
+                self.r_inverted += 1
+                r *= -1
+                ifft_l *= -1
+                ifft_r *= -1
+                self.r_sum_abs += r
+            mix = rwindow.xfade_with_windows(ifft_l, self.xfade_buffer, r, self.xfade_table)
+            mix_bus[int(current_output_time) : int(current_output_time) + self.hop_size] += mix
+            self.xfade_buffer = ifft_r
+        else:
+            mix = ifft * self.synthesis_window_array
+            mix_bus[int(current_output_time) : int(current_output_time) + self.nfft] += mix
+
+    def stretch(self, input_signal, playback_rate, mix_bus):
+        if self.phase_mode in ('randomize', 'interpolate'):
+            padded_input_signal = np.concatenate([np.zeros(self.nfft//2), input_signal, np.zeros(self.nfft//2)])
+        else: # self.phase_mode == 'keep'
+            padded_input_signal = np.concatenate([input_signal, np.zeros(self.nfft)])
         input_end_time = len(padded_input_signal) - self.nfft
         current_input_time = 0
         current_output_time = 0
+        num_frames = 0
         while current_input_time < input_end_time:
             progress = int(100 * current_input_time / input_end_time)
-            sys.stdout.write(f'\t{progress}% complete \r')
+            sys.stdout.write(f'{progress}% complete \r')
             sys.stdout.flush()
-            self.process_frame(padded_input_signal, current_input_time, current_output_time, mix_bus, randomize_phases)
+            self.process_frame(padded_input_signal, current_input_time, current_output_time, mix_bus, playback_rate)
             current_input_time += self.hop_size * playback_rate
             current_output_time += self.hop_size
-        print('\t100% complete')
+            num_frames += 1
+        print('100% complete')
+        log.debug(f'Number of frames: {num_frames}')
+        if self.variable_window:
+            log.debug(f'Average frame correlation without phase correction r_av = {self.r_sum / num_frames}')
+            if self.nonnegative_phases:
+                log.debug(f'Number of negative frame correlations: {self.r_inverted}')
+                log.debug(f'Average frame correlation with phase correction r_av_abs = {self.r_sum_abs / num_frames}')
 
-def fancy_stretch(temp_dir, input_signal, playback_rate, channel, overlap=4, window='hann', randomize_phases=True):
-    target_length = np.ceil(len(input_signal) / playback_rate) + max(fancy_bands.keys())
+def fancy_stretch(temp_dir, input_signal, playback_rate, channel, preset):
+    max_nfft = max(preset.nfft)
+    target_length = np.ceil(len(input_signal) / playback_rate) + max_nfft
     mix_bus_path = join(temp_dir, f'channel-{channel}.dat')
     mix_bus = np.memmap(mix_bus_path, dtype='float32', mode='w+', shape=int(target_length))
-    for nfft in fancy_bands.keys():
-        band = AnalysisBand(nfft, overlap, window)
-        print(f'stretching size {nfft}')
-        band.stretch(input_signal, playback_rate, mix_bus, randomize_phases)
+    for index, band_preset in preset.iterrows():
+        log.info(f'Stretching size {band_preset.nfft}')
+        log.debug(f'Settings: low_bin={band_preset.low_bin}, high_bin_plus_1={band_preset.high_bin_plus_1}, synthesis_window={band_preset.synthesis_window}, phase_mode={band_preset.phase_mode}, nonnegative_phases={band_preset.nonnegative_phases}')
+        band = AnalysisBand(band_preset.nfft, band_preset.low_bin, band_preset.high_bin_plus_1, band_preset.synthesis_window, band_preset.phase_mode, band_preset.nonnegative_phases)
+        band.stretch(input_signal, playback_rate, mix_bus)
     return mix_bus
