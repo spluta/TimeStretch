@@ -1,27 +1,25 @@
-
-NessWindow {
-	*ar { |trig, rVal=0.25, widthSamples=8192|
-		var fs = (1-(Slew.ar(
-			1-Trig1.ar(trig, widthSamples/2/SampleRate.ir),
-			SampleRate.ir/(widthSamples/2),
-			SampleRate.ir/(widthSamples/2))));
-		fs = (fs*pi/2).tan**2;
-		^(fs*((1/(1+(2*fs*rVal)+(fs**2))).sqrt))
-	}
+NRT_Server_ID {
+	classvar <id=5000;
+	*initClass { id = 5000; }
+	*next  { ^id = id + 1; }
+	*path {this.filenameSymbol.postln}
 }
 
+NRT_Server_Inc {
+	classvar <id=0;
+	*initClass { id = 0; }
+	*next  { ^id = id + 1; }
+	*path {this.filenameSymbol.postln}
+}
 
 TimeStretch2 {
-	classvar synths;
 	//by Sam Pluta - sampluta.com
 	// Based on the Alex Ness's NessStretch algorithm in Python
 	// thanks to Jean-Philippe Drecourt for his implementation of Paul Stretch, which was a huge influence on this code
 
 	*initClass {
-		synths = List.newClear(0);
 		StartUp.add {
-
-			SynthDef(\pb_monoStretch2_Overlap2, { |out = 0, bufnum, pan = 0, stretch = 100, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1|
+			SynthDef(\pb_monoStretch2_Overlap2, { |out = 0, bufnum, stretch = 100, startPos = 0, fftSize = 8192, fftMax = 65536, hiPass = 0, lowPass=0, amp = 1, gate = 1|
 				var trigPeriod, sig, chain, trig, trig1, trig2, pos, jump, trigEnv, fftDelay, bigEnv, window0, window1, rVal, correlation, sum, localIn, rVal1, rVal2, outSig, analSig;
 
 				trigPeriod = (fftSize/SampleRate.ir);
@@ -36,20 +34,19 @@ TimeStretch2 {
 				jump = fftSize/stretch/2;
 				pos = [pos, pos + jump];
 
-				sig = PlayBuf.ar(1, bufnum, 1, trig1, pos, 1);
+				sig = PlayBuf.ar(1, bufnum, 1, trig1, pos, 1)*SinOsc.ar(1/(2*trigPeriod)).abs*0.5;
 
 				sig = sig.collect({ |item, i|
-					chain = FFT(LocalBuf(fftSize), item, hop: 1.0, wintype: 1);
+					chain = FFT(LocalBuf(fftSize), item, hop: 1.0, wintype: 0);
 					chain = PV_Diffuser(chain, 1-trig1);
 					chain = PV_BrickWall(chain, hiPass);
 					chain = PV_BrickWall(chain, lowPass-1);
 					item = IFFT(chain, wintype: -1);
 				}).flatten;
 
-
 				//delay the signal so that all fftSizes line up (the will already be delayed by the fftSize
 				sig = DelayC.ar(sig, fftMax-fftSize+BlockSize.ir/SampleRate.ir, fftMax-fftSize+BlockSize.ir/SampleRate.ir);
-/*
+				/*
 				analSig = [sig[1],sig[3]];
 				sig = [sig[0], sig[2]];*/
 
@@ -78,13 +75,6 @@ TimeStretch2 {
 
 				LocalOut.ar(rVal2);
 
-				/*				phase0 = DelayC.ar(LocalIn.ar(1), trigPeriod/2, trigPeriod/2-(BlockSize.ir/SampleRate.ir))*ToggleFF.ar(Latch.ar(sum, trig1))*2-1;
-				phase1 = DelayC.ar(phase0, trigPeriod/2, trigPeriod/2)*(ToggleFF.ar(Latch.ar(sum, trig2))*2-1);
-
-				LocalOut.ar(phase1);*/
-
-				//get rid of this abs when dealing with negative phase
-
 				window0 = NessWindow.ar(trig1, rVal.abs, fftSize)*rVal1;
 				window1 = NessWindow.ar(trig2, rVal.abs, fftSize)*rVal2;
 
@@ -104,7 +94,7 @@ TimeStretch2 {
 				outSig = LPF.ar(LPF.ar(outSig, (lowPass).clip(20, SampleRate.ir/2)), (lowPass).clip(20, SampleRate.ir/2));
 
 
-				Out.ar(out, Pan2.ar(Mix.new(outSig), pan)/2*bigEnv*amp);
+				Out.ar(out, Mix.new(outSig)*bigEnv*amp);
 
 				//Out.ar(out, [sig[0], sig[1], rVal, window0, window1])
 			}).writeDefFile;
@@ -153,7 +143,7 @@ TimeStretch2 {
 
 			nrtJam = Score.new();
 
-			nrtJam = this.addBundles(nrtJam, server, inFile, buffer0, 0, durMult, -1, amp, filtVals, fftVals, fftMax);
+			nrtJam = this.addBundles(nrtJam, server, inFile, buffer0, 0, durMult, 0, amp, filtVals, fftVals, fftMax);
 			if(numChans>1){
 				nrtJam = this.addBundles(nrtJam, server, inFile, buffer1, 1, durMult, 1, amp, filtVals, fftVals, fftMax);
 			};
@@ -177,14 +167,18 @@ TimeStretch2 {
 		}{"Not an audio file!".postln;}
 	}
 
-	*addBundles {|nrtJam, server, inFile, buffer, chanNum, durMult, pan, amp, filtVals, fftVals, fftMax|
+	*addBundles {|nrtJam, server, inFile, buffer, chanNum, durMult, outChan, amp, filtVals, fftVals, fftMax|
 
 		nrtJam.add([0.0, buffer.allocReadChannelMsg(inFile.fullPath, 0, -1, [chanNum])]);
 		filtVals.do{|fv, i|
-			nrtJam.add([0.0, Synth.basicNew(("\pb_monoStretch2_Overlap2"), server).newMsg(args: [bufnum: buffer.bufnum, pan: pan, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0].postln, \lowPass, (fv[1]).postln, \amp, amp])])
+			//nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch2_Overlap_"++fftVals[i].asInteger).asSymbol.postln, server).newMsg(args: [\out, outChan, \bufnum, buffer.bufnum, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0].postln, \lowPass, (fv[1]).postln, \amp, amp])])
+			nrtJam.add([0.0, Synth.basicNew((\pb_monoStretch2_Overlap2), server).newMsg(args: [\out, outChan, \bufnum, buffer.bufnum, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0].postln, \lowPass, (fv[1]).postln, \amp, amp])])
 		};
 		^nrtJam
 	}
+
+
+
 
 }
 
