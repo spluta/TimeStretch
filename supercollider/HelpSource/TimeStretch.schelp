@@ -40,7 +40,7 @@ Path to the input file to be stretch. Can be a mono or stereo file.
 
 argument::outFile
 
-Path to the destination output file. Will output a mono or stereo file corresponding to the input. Will output a WAV file up to 4gb and a CAF if larger.
+Path to the destination output file. Will create a temporary folder
 
 argument::dur
 
@@ -58,6 +58,17 @@ argument:: chunkSize
 
 The program will break the incoming audio into multiple output files, each with chunkSize samples. These files will go into a directory named after the name given to the outFile.
 
+argument:: startChan
+
+Default is 0. This is the index to start on in the channel array.
+
+argument:: startFrame
+
+Default is 0. This is the frame to start processing on. If the process has already made a number of frames, and the processes was interrupted somehow, the process can start in the middle, at any frame that has already written its temporary buffer.
+
+argument:: fft/real fft
+
+Whether to use an (0) FFT or (1) Real-FFT. Real-FFT is default.
 
 method::mergeFiles
 
@@ -85,6 +96,7 @@ TimeStretch.stretch("Bieber", "BieberOut", 20, 100, [0,1]); //try it with Biebs
 //The new sound file will go into the default recordings directory in SC
 TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", -1, 100, [0]);
 
+//merge the files in the temporary folder into one file (requires FluidBufCompose from the FluCoMa library)
 TimeStretch.mergeFiles(s, Platform.recordingsDir +/+ "a11wlk01_10_render/", 1)
 
 //If the above throws an error, you may need to increase the default Server memory allocation when using multiple FFT layers. If so, run the following before running the above line of code

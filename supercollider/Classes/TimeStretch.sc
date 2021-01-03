@@ -37,6 +37,12 @@ PaulWindow {
 	}
 }
 
+TestLSOF {
+	*test{
+
+	}
+}
+
 TimeStretch {
 	classvar <>tanWindows, <>fftCosTables, startTime;
 
@@ -143,7 +149,7 @@ TimeStretch {
 		}
 	}
 
-	*processChunk {|server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverID|
+	*processChunk {|server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, realFFT=1|
 		var frameChunk = frameChunks[fCNum];
 		var writeFile;
 		var bigList = List.fill(chunkSize, {0});
@@ -178,10 +184,15 @@ TimeStretch {
 				arrayA = lastArrayA[num];
 			};
 
+
 			numFrames.do{|frameNum|
 				pointer = (fCNum*(numFrames*step))+(frameNum*step);
 
-				arrayB = this.phaseRando(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
+				if(realFFT==0){
+					arrayB = this.phaseRando(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
+				}{
+					arrayB = this.phaseRandoRFFT(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
+				};
 
 				smallArrays = [arrayA.copyRange((windowSize/2).asInteger, windowSize-1), arrayB.copyRange(0, (windowSize/2).asInteger-1)];
 
@@ -207,18 +218,103 @@ TimeStretch {
 			"time: ".post;
 			(Main.elapsedTime-startTime).postln;
 			finalBuf0.write(writeFile);
-			//SystemClock.sched(10, {finalBuf0.free});
+
+			lastArrayA.writeArchive(tempDir++"lastArrays/"++PathName(outFile).fileNameWithoutExtension++"_"++chanNum++"_"++fCNum++".lastArray");
 			fCNum = fCNum+1;
 			if(fCNum<frameChunks.size){
 				"next Chunk".postln;
 
-				this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverID);
+				this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, realFFT);
 			}{
 				"doneWChannel".postln;
-				NetAddr("127.0.0.1", NetAddr.langPort).sendMsg(("/"++serverID).asSymbol, "doit");
+				NetAddr("127.0.0.1", NetAddr.langPort).sendMsg(("/"++serverNum).asSymbol, "doit");
 			}
 		});
 
+	}
+
+	*stretch {|inFile, outFile, dur, durMult=100, chanArray, chunkSize = 3276800, startChan=0, startFrame=0, realFFT=1|
+		var serverNum, server;
+
+		serverNum = 57110+NRT_Server_Inc.next;
+		while(
+			{("lsof -i:"++serverNum++" ").unixCmdGetStdOut.size > 0},
+			{serverNum = 57110+NRT_Server_Inc.next; serverNum.postln}
+		);
+
+		("server id: "++serverNum).postln;
+		server = Server(("lang "++serverNum).asSymbol, NetAddr("127.0.0.1", serverNum),
+		options: Server.local.options
+		);
+
+		server.waitForBoot{
+			var maxWindowSize = 65536, numSamplesToProcess, sf;
+			var totalFrames, totalChunks, frameChunks, tempDir;
+			var lastArrayA, chanNum, chanCount;
+
+			this.makeWindows;
+			this.makeFftCosTables;
+
+			startTime = Main.elapsedTime;
+
+			tempDir = (PathName(outFile).pathOnly++PathName(outFile).fileNameWithoutExtension++"_render/").standardizePath;
+
+			if(PathName(tempDir).isFolder.not){("mkdir "++tempDir.escapeChar($ )).systemCmd};
+			if(PathName(tempDir++"lastArrays/").isFolder.not){("mkdir "++(tempDir++"lastArrays/").escapeChar($ )).systemCmd};
+
+			sf = SoundFile.openRead(inFile);
+			if(dur<0){
+				numSamplesToProcess=sf.numFrames-maxWindowSize;
+				dur = sf.duration;
+			}{numSamplesToProcess=sf.sampleRate*dur};
+			numSamplesToProcess.postln;
+
+			chanArray = chanArray ?? Array.fill(sf.numChannels, {|i| i});
+
+			totalFrames = numSamplesToProcess*durMult+(sf.sampleRate*3);
+			totalChunks = totalFrames/(chunkSize);
+
+			frameChunks = Array.fill(totalChunks.floor, {chunkSize}).add(totalFrames-(totalChunks.floor*chunkSize));
+
+			"Processing Chunks: ".post; totalChunks.postln;
+			"Frame Chunks: ".post; frameChunks.postln;
+
+			if(startFrame==0){
+				lastArrayA = List.newClear(9);
+			}{
+				var file;
+				"loading last array ".post;
+				file = (tempDir++"lastArrays/"++PathName(outFile).fileNameWithoutExtension++"_"++startChan++"_"++(startFrame-1)++".lastArray").postln;
+				lastArrayA = Object.readArchive(file);
+			};
+
+
+			chanNum = chanArray[startChan];
+
+			Buffer.readChannel(server, inFile, 0, -1, [chanNum], {|buffer|
+				buffer.loadToFloatArray(action:{|floatArray|
+					this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, realFFT);
+				});
+			});
+
+			OSCFunc({|msg, time, addr, recvPort|
+				msg.postln;
+				"nextChan".postln;
+				chanCount = chanCount+1;
+				chanCount.postln;
+				if(chanArray[chanCount]!=nil){
+					chanNum = chanArray[chanCount];
+					Buffer.readChannel(server, inFile, 0, -1, [chanCount], {|buffer|
+						buffer.loadToFloatArray(action:{|floatArray|
+							this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, realFFT);
+						});
+					});
+				}{
+					"we're done".postln;
+					server.quit;
+				}
+			}, ("/"++serverNum).asSymbol);
+		}
 	}
 
 	*mergeFiles {|server, folderIn, numChans=2|
@@ -241,7 +337,12 @@ TimeStretch {
 					FluidBufCompose.process(server, buffers[1][counter], 0, -1, 0, -1, 1, finalBuf, counter*chunkSize, 1, action:{doit1.value(counter+1)});
 				}{
 					"write file".postln;
-					finalBuf.write(folder.fullPath++folder.folderName++".wav");
+					finalBuf.duration.postln;
+					if((finalBuf.duration*finalBuf.numChannels)>5000){
+						finalBuf.write(folder.fullPath++folder.folderName++".w64", "w64", "int24");
+					}{
+						finalBuf.write(folder.fullPath++folder.folderName++".wav", "wav", "int24");
+					}
 				}
 			};
 
@@ -254,7 +355,12 @@ TimeStretch {
 						FluidBufCompose.process(server, buffers[1][0], 0, -1, 0, -1, 1, finalBuf, 0, 0, 0,  action:{doit1.value(0)});
 					}{
 						"write file".postln;
-						finalBuf.write(folder.fullPath++folder.folderName++".wav");
+						if((finalBuf.duration*finalBuf.numChannels)>5000){
+							"w64".postln;
+							finalBuf.write(folder.fullPath++folder.folderName++".w64", "w64", "int24");
+						}{
+							finalBuf.write(folder.fullPath++folder.folderName++".wav", "wav", "int24");
+						}
 					}
 				}
 			};
@@ -262,79 +368,6 @@ TimeStretch {
 
 			FluidBufCompose.process(server, buffers[0][0], 0, -1, 0, -1, 1, finalBuf, 0, 0, 0,  action:{doit0.value(0, 0)});
 		};
-	}
-
-
-
-	*stretch {|inFile, outFile, dur, durMult=100, chanArray, chunkSize = 3276800|
-		var server, serverID;
-
-		serverID = "lang"++NRT_Server_ID.next;
-
-		server = Server((serverID).asSymbol, NetAddr("127.0.0.1", 57110+NRT_Server_Inc.next),
-			options: Server.local.options
-		);
-
-		server.waitForBoot{
-			var maxWindowSize = 65536, numSamplesToProcess, sf;
-			var totalFrames, totalChunks, frameChunks, tempDir;
-			var lastArrayA, chanNum, chanCount;
-
-			this.makeWindows;
-			this.makeFftCosTables;
-
-			startTime = Main.elapsedTime;
-
-			tempDir = (PathName(outFile).pathOnly++PathName(outFile).fileNameWithoutExtension++"_render/").standardizePath;
-
-			if(PathName(tempDir).isFolder.not){("mkdir "++tempDir.escapeChar($ )).systemCmd};
-
-			sf = SoundFile.openRead(inFile);
-			if(dur<0){
-				numSamplesToProcess=sf.numFrames-maxWindowSize;
-				dur = sf.duration;
-			}{numSamplesToProcess=sf.sampleRate*dur};
-			numSamplesToProcess.postln;
-
-			chanArray = chanArray ?? Array.fill(sf.numChannels, {|i| i});
-
-			totalFrames = numSamplesToProcess*durMult+(sf.sampleRate*3);
-			totalChunks = totalFrames/(chunkSize);
-
-			frameChunks = Array.fill(totalChunks.floor, {chunkSize}).add(totalFrames-(totalChunks.floor*chunkSize));
-
-			"Processing Chunks: ".post; totalChunks.postln;
-			"Frame Chunks: ".post; frameChunks.postln;
-
-			lastArrayA = List.newClear(9);
-
-			chanCount = 0;
-			chanNum = chanArray[chanCount];
-
-			Buffer.readChannel(server, inFile, 0, -1, [chanNum], {|buffer|
-				buffer.loadToFloatArray(action:{|floatArray|
-					this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverID);
-				});
-			});
-
-			OSCFunc({|msg, time, addr, recvPort|
-				msg.postln;
-				"nextChan".postln;
-				chanCount = chanCount+1;
-				chanCount.postln;
-				if(chanArray[chanCount]!=nil){
-					chanNum = chanArray[chanCount];
-					Buffer.readChannel(server, inFile, 0, -1, [chanCount], {|buffer|
-						buffer.loadToFloatArray(action:{|floatArray|
-							this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverID);
-						});
-					});
-				}{
-					"we're done".postln;
-					server.quit;
-				}
-			}, ("/"++serverID).asSymbol);
-		}
 	}
 
 }
