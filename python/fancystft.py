@@ -11,7 +11,6 @@ from os.path import join
 import logging as log
 import rwindow
 import numpy as np
-import scipy.io.wavfile
 import scipy.signal
 import sys
 
@@ -115,7 +114,7 @@ class AnalysisBand(object):
             mix = ifft * self.synthesis_window_array
             mix_bus[int(current_output_time) : int(current_output_time) + self.nfft] += mix
 
-    def stretch(self, input_signal, playback_rate, mix_bus):
+    def stretch(self, input_signal, playback_rate, channel, mix_bus):
         if self.phase_mode in ('randomize', 'interpolate'):
             padded_input_signal = np.concatenate([np.zeros(self.nfft//2), input_signal, np.zeros(self.nfft//2)])
         else: # self.phase_mode == 'keep'
@@ -126,13 +125,13 @@ class AnalysisBand(object):
         num_frames = 0
         while current_input_time < input_end_time:
             progress = int(100 * current_input_time / input_end_time)
-            sys.stdout.write(f'{progress}% complete \r')
+            sys.stdout.write(f'Channel {channel + 1}, FFT size {self.nfft:6d}: {progress:3d}% complete \r')
             sys.stdout.flush()
             self.process_frame(padded_input_signal, current_input_time, current_output_time, mix_bus, playback_rate)
             current_input_time += self.hop_size * playback_rate
             current_output_time += self.hop_size
             num_frames += 1
-        print('100% complete')
+        print(f'Channel {channel + 1}, FFT size {self.nfft:6d}: 100% complete')
         log.debug(f'Number of frames: {num_frames}')
         if self.variable_window:
             log.debug(f'Average frame correlation without phase correction r_av = {self.r_sum / num_frames}')
@@ -149,5 +148,5 @@ def fancy_stretch(temp_dir, input_signal, playback_rate, channel, preset):
         log.info(f'Stretching size {band_preset.nfft}')
         log.debug(f'Settings: low_bin={band_preset.low_bin}, high_bin_plus_1={band_preset.high_bin_plus_1}, synthesis_window={band_preset.synthesis_window}, phase_mode={band_preset.phase_mode}, nonnegative_phases={band_preset.nonnegative_phases}')
         band = AnalysisBand(band_preset.nfft, band_preset.low_bin, band_preset.high_bin_plus_1, band_preset.synthesis_window, band_preset.phase_mode, band_preset.nonnegative_phases)
-        band.stretch(input_signal, playback_rate, mix_bus)
+        band.stretch(input_signal, playback_rate, channel, mix_bus)
     return mix_bus

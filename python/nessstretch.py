@@ -11,7 +11,7 @@ import argparse
 import logging as log
 import numpy as np
 import pandas as pd
-import scipy
+import scipy.io.wavfile
 import datetime as dt
 from os.path import join
 from fancystft import fancy_stretch
@@ -58,10 +58,10 @@ def render(infile, outfile, rate, preset_file, preset_name):
         log.info('Normalizing audio')
         factor = norm_factor(output, normalized_input_data)
         audio_array_path = join(temp_dir, 'audio.dat')
-        audio_array_shape = (n_channels, len(output))
+        audio_array_shape = (len(output[0]), n_channels)
         audio_array = np.memmap(audio_array_path, dtype='int16', mode='w+', shape=audio_array_shape)
         # Transpose array: see https://github.com/bastibe/SoundFile/issues/203
-        audio_array = np.int16(np.array(output).T * factor * max_dtype_val)
+        audio_array[:,:] = np.int16(np.array(output).T * factor * max_dtype_val)
         log.info(f'Writing audio to "{args.outfile.name}"')
         scipy.io.wavfile.write(outfile, input_sample_rate, audio_array)
     log.info(f'Deleting temporary files')
