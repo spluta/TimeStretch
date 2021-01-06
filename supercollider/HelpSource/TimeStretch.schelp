@@ -4,7 +4,7 @@ related:: TimeStretch2, Classes/FFT, Classes/IFFT, Classes/PV_Diffuser, Classes/
 categories::  UGens>FFT
 
 Description::
-TimeStretch is the Cadillac of time stretching algorithms. All calculations and audio processing are done in the language, so it is slow. For a faster version that uses the server, but doesn't sound quite as good, check out TimeStretch2.
+TimeStretch is the classic Cadillac of time stretching algorithms - a big, hulking, and slow beauty. All calculations and audio processing are done in the language, thus calculations move at a glacial pace. For a faster version that uses the server, but doesn't sound quite as good, check out TimeStretch2.
 
 Implements a phase randomized FFT time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
@@ -26,7 +26,7 @@ Implements a phase randomized FFT time stretch algorithm, the Ness Stretch, whic
 
 11025-22050 : 256
 
-The algorithm also correlates each grain in the FFT with the previous and next grain, and creates a custom crossfade for each grain based on the correlations between grains
+The algorithm also correlates each grain in the FFT with the previous and next grain, and creates a custom crossfade for each overlap based on the correlations between grains.
 
 classmethods::
 
@@ -58,17 +58,13 @@ argument:: chunkSize
 
 The program will break the incoming audio into multiple output files, each with chunkSize samples. These files will go into a directory named after the name given to the outFile.
 
-argument:: startChan
-
-Default is 0. This is the index to start on in the channel array.
-
 argument:: startFrame
 
-Default is 0. This is the frame to start processing on. If the process has already made a number of frames, and the processes was interrupted somehow, the process can start in the middle, at any frame that has already written its temporary buffer.
+Default is 0. This is the frame to start processing on. If the process has already made a number of frames, and was interrupted somehow, the process can be started in the middle by indicating here the last chunk that was successfully written to disk.
 
-argument:: fft/real fft
+argument:: fftType
 
-Whether to use an (0) FFT or (1) Real-FFT. Real-FFT is default.
+Whether to use an (0) FFT or (1) Real-FFT. Standard FFT is default. Real FFT requires the SignalBox Quark
 
 method::mergeFiles
 

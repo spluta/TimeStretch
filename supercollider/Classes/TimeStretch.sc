@@ -149,7 +149,7 @@ TimeStretch {
 		}
 	}
 
-	*processChunk {|server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, realFFT=1|
+	*processChunk {|server, tempDir, floatArray, chanNum, outFolder, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=0|
 		var frameChunk = frameChunks[fCNum];
 		var writeFile;
 		var bigList = List.fill(chunkSize, {0});
@@ -158,7 +158,7 @@ TimeStretch {
 		fftCosTables.postln;
 
 		("Chan Num: "++chanNum).postln;
-		("Chunk "++fCNum++" of "++frameChunks.size).postln;
+		("Chunk "++(fCNum)++" of "++(frameChunks.size-1)).postln;
 
 		9.do{|num|
 			var correlations, getNext, windowSize, step, windowEnv, fftWind, numFrames, smallArrays, addArray, correlation, lowBin, highBin, pointer;
@@ -179,16 +179,17 @@ TimeStretch {
 			"step ".postln; step.postln;
 
 			if(fCNum==0){
-				arrayA = Array.fill(windowSize, {0})
+				arrayA = Array.fill(windowSize, {0});
 			}{
 				arrayA = lastArrayA[num];
 			};
 
 
 			numFrames.do{|frameNum|
-				pointer = (fCNum*(numFrames*step))+(frameNum*step);
-
-				if(realFFT==0){
+				//fCNum.postln; chunkSize.postln;
+				pointer = (fCNum*(chunkSize/durMult))+(frameNum*step);
+				//(pointer+windowSize-1).postln;
+				if(fftType==0){
 					arrayB = this.phaseRando(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
 				}{
 					arrayB = this.phaseRandoRFFT(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
@@ -212,28 +213,28 @@ TimeStretch {
 			lastArrayA.put(num, arrayA);
 		};
 
-		writeFile = tempDir++PathName(outFile).fileNameWithoutExtension++"_"++chanNum++"_"++fCNum++".wav";
+		writeFile = tempDir++PathName(outFolder).folderName++"_"++chanNum++"_"++fCNum++".wav";
 
 		Buffer.loadCollection(server, bigList, 1, {|finalBuf0|
 			"time: ".post;
 			(Main.elapsedTime-startTime).postln;
 			finalBuf0.write(writeFile);
 
-			lastArrayA.writeArchive(tempDir++"lastArrays/"++PathName(outFile).fileNameWithoutExtension++"_"++chanNum++"_"++fCNum++".lastArray");
+			lastArrayA.writeArchive(tempDir++"lastArrays/"++PathName(outFolder).folderName++"_"++chanNum++"_"++fCNum++".lastArray");
 			fCNum = fCNum+1;
 			if(fCNum<frameChunks.size){
 				"next Chunk".postln;
 
-				this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, realFFT);
+				this.processChunk(server, tempDir, floatArray, chanNum, outFolder, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType);
 			}{
 				"doneWChannel".postln;
-				NetAddr("127.0.0.1", NetAddr.langPort).sendMsg(("/"++serverNum).asSymbol, "doit");
+				NetAddr("127.0.0.1", NetAddr.langPort).sendMsg(("/"++serverNum).asSymbol, "process next chan");
 			}
 		});
 
 	}
 
-	*stretch {|inFile, outFile, dur, durMult=100, chanArray, chunkSize = 3276800, startChan=0, startFrame=0, realFFT=1|
+	*stretch {|inFile, outFolder, dur, durMult=100, chanArray, chunkSize = 3276800, startFrame=0, fftType=0|
 		var serverNum, server;
 
 		serverNum = 57110+NRT_Server_Inc.next;
@@ -244,7 +245,7 @@ TimeStretch {
 
 		("server id: "++serverNum).postln;
 		server = Server(("lang "++serverNum).asSymbol, NetAddr("127.0.0.1", serverNum),
-		options: Server.local.options
+			options: Server.local.options
 		);
 
 		server.waitForBoot{
@@ -257,21 +258,24 @@ TimeStretch {
 
 			startTime = Main.elapsedTime;
 
-			tempDir = (PathName(outFile).pathOnly++PathName(outFile).fileNameWithoutExtension++"_render/").standardizePath;
+			if(outFolder.last.asString!="/"){outFolder=outFolder++"/"};
+
+			tempDir = (PathName(outFolder).pathOnly).standardizePath;
+
 
 			if(PathName(tempDir).isFolder.not){("mkdir "++tempDir.escapeChar($ )).systemCmd};
-			if(PathName(tempDir++"lastArrays/").isFolder.not){("mkdir "++(tempDir++"lastArrays/").escapeChar($ )).systemCmd};
+			if(PathName(tempDir++"lastArrays/").isFolder.not){("mkdir "++(tempDir++"lastArrays/").escapeChar($ )).postln.systemCmd};
 
 			sf = SoundFile.openRead(inFile);
 			if(dur<0){
-				numSamplesToProcess=sf.numFrames-maxWindowSize;
+				numSamplesToProcess=sf.numFrames;
 				dur = sf.duration;
 			}{numSamplesToProcess=sf.sampleRate*dur};
 			numSamplesToProcess.postln;
 
 			chanArray = chanArray ?? Array.fill(sf.numChannels, {|i| i});
 
-			totalFrames = numSamplesToProcess*durMult+(sf.sampleRate*3);
+			totalFrames = numSamplesToProcess*durMult;
 			totalChunks = totalFrames/(chunkSize);
 
 			frameChunks = Array.fill(totalChunks.floor, {chunkSize}).add(totalFrames-(totalChunks.floor*chunkSize));
@@ -279,21 +283,51 @@ TimeStretch {
 			"Processing Chunks: ".post; totalChunks.postln;
 			"Frame Chunks: ".post; frameChunks.postln;
 
+			chanCount = 0;
 			if(startFrame==0){
 				lastArrayA = List.newClear(9);
 			}{
-				var file;
-				"loading last array ".post;
-				file = (tempDir++"lastArrays/"++PathName(outFile).fileNameWithoutExtension++"_"++startChan++"_"++(startFrame-1)++".lastArray").postln;
-				lastArrayA = Object.readArchive(file);
+				if(startFrame>0){
+					var file;
+					("loading last array from frame"++startFrame).post;
+					file = (tempDir++"lastArrays/"++PathName(outFolder).folderName++"_"++chanArray[0]++"_"++(startFrame-1)++".lastArray").postln;
+					file.postln;
+					lastArrayA = Object.readArchive(file);
+				}{
+					var files, num, fileToLoad;
+					"loading last array ".post;
+					num = -1;
+					files = PathName(tempDir).files;
+					files.do{|file|
+						var temp;
+						temp = file.fileName.findAll("_");
+						temp = file.fileName.copyRange(temp[temp.size-2]+1, temp.last-1).asInteger;
+						temp.postln;
+						if(temp==chanArray[0]){
+							temp.postln;
+							temp = file.fileName.findAll("_").addAll(file.fileName.findAll("."));
+							temp = file.fileName.copyRange(temp[temp.size-2]+1, temp.last-1).asInteger;
+
+							if(temp>num){num=temp};
+
+					}};
+					startFrame = num+1;
+					if(startFrame>0){
+						fileToLoad = (tempDir++"lastArrays/"++PathName(outFolder).fileNameWithoutExtension++"_"++chanArray[0]++"_"++(startFrame-1)++".lastArray").postln;
+						lastArrayA = Object.readArchive(fileToLoad);
+					}{
+						lastArrayA = List.newClear(9);
+					}
+				}
 			};
 
 
-			chanNum = chanArray[startChan];
+			chanNum = chanArray[0];
 
 			Buffer.readChannel(server, inFile, 0, -1, [chanNum], {|buffer|
 				buffer.loadToFloatArray(action:{|floatArray|
-					this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, realFFT);
+					floatArray = floatArray.addAll(FloatArray.fill(maxWindowSize*2, {0}));
+					this.processChunk(server, tempDir, floatArray, chanNum, outFolder, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, fftType);
 				});
 			});
 
@@ -306,7 +340,8 @@ TimeStretch {
 					chanNum = chanArray[chanCount];
 					Buffer.readChannel(server, inFile, 0, -1, [chanCount], {|buffer|
 						buffer.loadToFloatArray(action:{|floatArray|
-							this.processChunk(server, tempDir, floatArray, chanNum, outFile, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, realFFT);
+							floatArray = floatArray.addAll(FloatArray.fill(maxWindowSize, {0}));
+							this.processChunk(server, tempDir, floatArray, chanNum, outFolder, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, fftType);
 						});
 					});
 				}{
@@ -317,21 +352,27 @@ TimeStretch {
 		}
 	}
 
-	*mergeFiles {|server, folderIn, numChans=2|
+	*mergeFiles {|server, folder, numChans=2|
 		server.waitForBoot{
-			var folder = PathName(folderIn);
+			var files, channels, chunkSize;
 
-			var files = folder.files.select{arg file; file.extension=="wav"};
 
-			var channels = numChans.collect{|chan| files.select{arg file; file.fullPath.contains("_"++chan++"_")}};
-
-			var buffers = channels.collect{|chan| chan.collect{|file| Buffer.read(server, file.fullPath)}};
+			var buffers, counter, doit;
 
 			var finalBuf = Buffer(server);
 
-			var chunkSize = SoundFile.openRead(files[0].fullPath).numFrames;
 
-			var doit1 = {|counter|
+
+			if(folder.last.asString!="/"){folder = folder++"/"};
+			folder.postln;
+			folder = PathName(folder);
+
+			files = folder.files.select{arg file; file.extension=="wav"};
+			channels = numChans.collect{|chan| files.select{arg file; file.fullPath.contains("_"++chan++"_")}};
+
+			chunkSize = SoundFile.openRead(files[0].fullPath).numFrames;
+
+/*			var doit1 = {|counter|
 				"chan1".postln;
 				if(counter<buffers[1].size){
 					FluidBufCompose.process(server, buffers[1][counter], 0, -1, 0, -1, 1, finalBuf, counter*chunkSize, 1, action:{doit1.value(counter+1)});
@@ -347,7 +388,7 @@ TimeStretch {
 			};
 
 			var doit0 = {|counter|
-				"chan0".postln;
+				("chan0"+"file"+counter).postln;
 				if(counter<buffers[0].size){
 					FluidBufCompose.process(server, buffers[0][counter], 0, -1, 0, -1, 1, finalBuf, counter*chunkSize, 0, action:{doit0.value(counter+1)})
 				}{
@@ -363,10 +404,40 @@ TimeStretch {
 						}
 					}
 				}
+			};*/
+			"merge files!".postln;
+			//FluidBufCompose.process(server, buffers[0][0], 0, -1, 0, -1, 1, finalBuf, 0, 0, 0,  action:{doit0.value(0, 0)});
+
+			doit = {Routine{
+				server.sync;
+				buffers.do{|chan, i|
+					chan.do{|buf, i2|
+						("chan:"+i+"buffer"+i2).postln;
+						FluidBufCompose.process(server, buf, 0, -1, 0, -1, 1, finalBuf, i*chunkSize, i2, 0);
+
+					};
+				};
+				server.sync;
+				"write file".postln;
+				//server.sync;
+				finalBuf.query;
+				server.sync;
+				finalBuf.duration.postln; finalBuf.numChannels.postln;
+				if((finalBuf.duration*finalBuf.numChannels)>5000){
+					"w64".postln;
+					finalBuf.write(folder.parentPath++folder.folderName++".w64", "w64", "int24");
+				}{
+					finalBuf.write(folder.parentPath++folder.folderName++".wav", "wav", "int24");
+				}
+			}.play};
+			counter = 0;
+			buffers = channels.collect{|chan| chan.collect{|file| Buffer.read(server, file.fullPath, 0, -1, {
+				counter = counter+1;
+				counter.postln;
+				if(counter==files.size){"buffers loaded".postln; doit.value};
+			})
+			}
 			};
-
-
-			FluidBufCompose.process(server, buffers[0][0], 0, -1, 0, -1, 1, finalBuf, 0, 0, 0,  action:{doit0.value(0, 0)});
 		};
 	}
 
