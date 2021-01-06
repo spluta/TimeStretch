@@ -37,10 +37,18 @@ PaulWindow {
 	}
 }
 
-TestLSOF {
-	*test{
+NRT_Server_ID {
+	classvar <id=5000;
+	*initClass { id = 5000; }
+	*next  { ^id = id + 1; }
+	*path {this.filenameSymbol.postln}
+}
 
-	}
+NRT_Server_Inc {
+	classvar <id=0;
+	*initClass { id = 0; }
+	*next  { ^id = id + 1; }
+	*path {this.filenameSymbol.postln}
 }
 
 TimeStretch {
@@ -234,7 +242,7 @@ TimeStretch {
 
 	}
 
-	*stretch {|inFile, outFolder, dur, durMult=100, chanArray, chunkSize = 3276800, startFrame=0, fftType=0|
+	*stretch {|inFile, outFolder, dur, durMult=100, chanArray, chunkSize = 3276800, startFrame=0, fftType=0, merge=0|
 		var serverNum, server;
 
 		serverNum = 57110+NRT_Server_Inc.next;
@@ -346,13 +354,29 @@ TimeStretch {
 					});
 				}{
 					"we're done".postln;
-					server.quit;
+					if(merge==1){
+						this.mergeFiles(outFolder, sf.numChannels);
+					}{
+						server.quit;
+					}
 				}
 			}, ("/"++serverNum).asSymbol);
 		}
 	}
 
-	*mergeFiles {|server, folder, numChans=2|
+	*mergeFiles {|folder, numChans=2|
+		var serverNum, server;
+		serverNum = 57110+NRT_Server_Inc.next;
+		while(
+			{("lsof -i:"++serverNum++" ").unixCmdGetStdOut.size > 0},
+			{serverNum = 57110+NRT_Server_Inc.next; serverNum.postln}
+		);
+
+		("server id: "++serverNum).postln;
+		server = Server(("lang "++serverNum).asSymbol, NetAddr("127.0.0.1", serverNum),
+			options: Server.local.options
+		);
+
 		server.waitForBoot{
 			var files, channels, chunkSize;
 
@@ -381,39 +405,6 @@ TimeStretch {
 
 			chunkSize = SoundFile.openRead(files[0].fullPath).numFrames;
 
-/*			var doit1 = {|counter|
-				"chan1".postln;
-				if(counter<buffers[1].size){
-					FluidBufCompose.process(server, buffers[1][counter], 0, -1, 0, -1, 1, finalBuf, counter*chunkSize, 1, action:{doit1.value(counter+1)});
-				}{
-					"write file".postln;
-					finalBuf.duration.postln;
-					if((finalBuf.duration*finalBuf.numChannels)>5000){
-						finalBuf.write(folder.fullPath++folder.folderName++".w64", "w64", "int24");
-					}{
-						finalBuf.write(folder.fullPath++folder.folderName++".wav", "wav", "int24");
-					}
-				}
-			};
-
-			var doit0 = {|counter|
-				("chan0"+"file"+counter).postln;
-				if(counter<buffers[0].size){
-					FluidBufCompose.process(server, buffers[0][counter], 0, -1, 0, -1, 1, finalBuf, counter*chunkSize, 0, action:{doit0.value(counter+1)})
-				}{
-					if(numChans>1){
-						FluidBufCompose.process(server, buffers[1][0], 0, -1, 0, -1, 1, finalBuf, 0, 0, 0,  action:{doit1.value(0)});
-					}{
-						"write file".postln;
-						if((finalBuf.duration*finalBuf.numChannels)>5000){
-							"w64".postln;
-							finalBuf.write(folder.fullPath++folder.folderName++".w64", "w64", "int24");
-						}{
-							finalBuf.write(folder.fullPath++folder.folderName++".wav", "wav", "int24");
-						}
-					}
-				}
-			};*/
 			"merge files!".postln;
 			//FluidBufCompose.process(server, buffers[0][0], 0, -1, 0, -1, 1, finalBuf, 0, 0, 0,  action:{doit0.value(0, 0)});
 
@@ -436,8 +427,10 @@ TimeStretch {
 				if((finalBuf.duration*finalBuf.numChannels)>5000){
 					//"w64".postln;
 					finalBuf.write(folder.parentPath++folder.folderName++".w64", "w64", "int24");
+					server.quit;
 				}{
 					finalBuf.write(folder.parentPath++folder.folderName++".wav", "wav", "int24");
+					server.quit;
 				}
 			}.play};
 			counter = 0;

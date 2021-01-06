@@ -66,6 +66,10 @@ argument:: fftType
 
 Whether to use an (0) FFT or (1) Real-FFT. Standard FFT is default. Real FFT requires the SignalBox Quark
 
+argument:: merge
+
+Goes on to merge the chunks into a single file upon completion.
+
 method::mergeFiles
 
 argument::server

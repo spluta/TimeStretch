@@ -1,17 +1,3 @@
-NRT_Server_ID {
-	classvar <id=5000;
-	*initClass { id = 5000; }
-	*next  { ^id = id + 1; }
-	*path {this.filenameSymbol.postln}
-}
-
-NRT_Server_Inc {
-	classvar <id=0;
-	*initClass { id = 0; }
-	*next  { ^id = id + 1; }
-	*path {this.filenameSymbol.postln}
-}
-
 TimeStretch2 {
 	//by Sam Pluta - sampluta.com
 	// Based on the Alex Ness's NessStretch algorithm in Python
