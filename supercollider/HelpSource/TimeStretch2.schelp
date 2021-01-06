@@ -1,10 +1,10 @@
-class:: TimeStretch
+class:: TimeStretch2
 summary:: Time Stretch
 related:: Classes/FFT, Classes/IFFT, Classes/PV_Diffuser, Classes/PV_BrickWall
 categories::  UGens>FFT
 
 Description::
-Implements a phase bashed FFT time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
+Implements a phase randomized FFT time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
 0-86hz : 65536
 

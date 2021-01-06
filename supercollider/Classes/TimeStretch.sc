@@ -364,10 +364,19 @@ TimeStretch {
 
 
 			if(folder.last.asString!="/"){folder = folder++"/"};
-			folder.postln;
+			//folder.postln;
 			folder = PathName(folder);
 
 			files = folder.files.select{arg file; file.extension=="wav"};
+
+			files = files.sort({arg a, b; var c, d;
+				c = a.fileNameWithoutExtension;
+				c = c.copyRange(c.findAll("_").last+1, c.size-1).asInteger;
+				d = b.fileNameWithoutExtension;
+				d = d.copyRange(d.findAll("_").last+1, d.size-1).asInteger;
+				c<d});
+
+			files.do{|file|file.postln};
 			channels = numChans.collect{|chan| files.select{arg file; file.fullPath.contains("_"++chan++"_")}};
 
 			chunkSize = SoundFile.openRead(files[0].fullPath).numFrames;
@@ -412,8 +421,9 @@ TimeStretch {
 				server.sync;
 				buffers.do{|chan, i|
 					chan.do{|buf, i2|
-						("chan:"+i+"buffer"+i2).postln;
-						FluidBufCompose.process(server, buf, 0, -1, 0, -1, 1, finalBuf, i*chunkSize, i2, 0);
+						//("chan:"+i+"buffer"+i2).postln;
+						"merging buffers...may take a while".postln;
+						FluidBufCompose.processBlocking(server, buf, 0, -1, 0, -1, 1, finalBuf, i2*chunkSize, i, 0, true, {("chan:"+i+"buffer"+i2).postln}).wait;
 
 					};
 				};
@@ -424,7 +434,7 @@ TimeStretch {
 				server.sync;
 				finalBuf.duration.postln; finalBuf.numChannels.postln;
 				if((finalBuf.duration*finalBuf.numChannels)>5000){
-					"w64".postln;
+					//"w64".postln;
 					finalBuf.write(folder.parentPath++folder.folderName++".w64", "w64", "int24");
 				}{
 					finalBuf.write(folder.parentPath++folder.folderName++".wav", "wav", "int24");

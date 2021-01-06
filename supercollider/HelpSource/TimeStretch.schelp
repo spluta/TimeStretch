@@ -38,9 +38,9 @@ argument::inFile
 
 Path to the input file to be stretch. Can be a mono or stereo file.
 
-argument::outFile
+argument::outFolder
 
-Path to the destination output file. Will create a temporary folder
+Path to the temporary destination output folder. Will create the folder if it does not exist.
 
 argument::dur
 
@@ -72,9 +72,9 @@ argument::server
 
 A server. Will boot if it isn't booted.
 
-argument::folderIn
+argument::folder
 
-The folder to look in
+The folder to look in to find the temporary file chunks.
 
 argument::numChans
 
