@@ -52,7 +52,7 @@ NRT_Server_Inc {
 }
 
 TimeStretch {
-	classvar <>tanWindows, <>fftCosTables, startTime;
+	classvar <>tanWindows, <>fftCosTables, <>hannWindows, startTime;
 
 	*phaseRando {|array, lowBin, highBin|
 		var real, imag, cosTable, phase, rando, complex, complex2, ifft, size, hann, mags, mags2, bins, idft, real2, imag2, spectrum, phases2;
@@ -60,17 +60,15 @@ TimeStretch {
 		size = array.size;
 		bins = (size/2).asInteger;
 
-		hann = Signal.hanningWindow(size);
+		hann = hannWindows[size.asSymbol];
 
-		real = Signal.newClear(size);
-		real.waveFill({|i| array[i]}, 0, size-1);
-
+		real = array.as(Signal);
 		real = real*hann;
 
-		imag = Signal.newClear(size);
-		cosTable = Signal.fftCosTable(size);
+		cosTable = fftCosTables[size.asSymbol];
 
-		//complex = fft(real, cosTable);
+		imag = Signal.newClear(size);
+
 		complex = fft(real, imag, cosTable);
 
 		spectrum = FreqSpectrum.newComplex(complex);
@@ -91,6 +89,34 @@ TimeStretch {
 
 
 	*phaseRandoRFFT {|array, lowBin, highBin|
+		var real, imag, cosTable, phase, rando, complex, complex2, ifft, size, hann, mags, mags2, bins, idft, real2, imag2, spectrum, phases2;
+
+		size = array.size;
+		bins = (size/2).asInteger;
+
+		hann = hannWindows[size.asSymbol];
+
+		real = array.as(Signal);
+		real = real*hann;
+
+		cosTable = fftCosTables[size.asSymbol];
+
+		complex = fft(real, nil, cosTable);
+
+		mags = complex.magnitude.copyRange(0, (size/2).asInteger).asList;
+
+		phases2 = complex.phase.copyRange(0, (size/2).asInteger).asList;
+
+		mags2 = Array.fill(mags.size, {0});
+		(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
+
+		spectrum = Polar(mags2, phases2.asArray);
+
+		ifft = spectrum.real.ifft(spectrum.imag, cosTable);
+		^ifft.real
+	}
+
+/*	*phaseRandoRFFT {|array, lowBin, highBin|
 		var real, imag, cosTable, phase, rando, complex, complex2, ifft, size, hann, mags, mags2, bins, idft, real2, imag2, spectrum, phases2;
 
 		size = array.size;
@@ -121,9 +147,11 @@ TimeStretch {
 
 		ifft = spectrum.real.irfft(spectrum.imag, cosTable);
 		^ifft.real
-	}
+	}*/
 
-	*makeWindows {
+
+
+	*makeWindows {|winType=1|
 		var temp, windowSizeList, window;
 
 		tanWindows = ();
@@ -134,26 +162,45 @@ TimeStretch {
 		windowSizeList.do{|windowSize|
 			temp = List.newClear(0);
 			(0, 0.01..0.3).do{|correlation|
-				window = Signal.newClear(windowSize).waveFill({|fs|
-					fs = (fs*pi/2).tan**2;
-					fs*((1/(1+(2*fs*(correlation))+(fs**2))).sqrt)
-				}, 0, 2);
+				if(winType==0){
+					window = Signal.newClear(windowSize/2).waveFill({|fs|
+						var phi, denom;
+						phi = pi*fs/2;
+						denom = (1+(2*correlation*(phi.sin)*(phi.cos))).sqrt;
+						phi.sin/denom
+					}, 0, 1).addAll(
+						Signal.newClear(windowSize/2).waveFill({|fs|
+							var phi, denom;
+							phi = pi*fs/2;
+							denom = (1+(2*correlation*(phi.sin)*(phi.cos))).sqrt;
+							phi.sin/denom
+						}, 0, 1).reverse
+					);
+
+				}{
+					"Ness Window".postln;
+					window = Signal.newClear(windowSize).waveFill({|fs|
+						fs = (fs*pi/2).tan**2;
+						fs*((1/(1+(2*fs*(correlation))+(fs**2))).sqrt)
+					}, 0, 2);
+				};
 				temp.add([window.copyRange(0, (windowSize/2-1).asInteger), window.copyRange((windowSize/2).asInteger, (windowSize-1).asInteger)]);
 			};
 			tanWindows.add(windowSize.asInteger.asSymbol -> temp);
 		}
 	}
 
-
 	*makeFftCosTables {
 		var windowSizeList;
 		fftCosTables = ();
+		hannWindows = ();
 		windowSizeList = List.newClear(0);
 		(8..0).collect{|i|
 			windowSizeList.add(2**(8+i));
 		};
 		windowSizeList.do{|windowSize|
 			fftCosTables.add(windowSize.asInteger.asSymbol -> Signal.fftCosTable(windowSize));
+			hannWindows.add(windowSize.asInteger.asSymbol -> Signal.hanningWindow(windowSize));
 		}
 	}
 
@@ -161,9 +208,6 @@ TimeStretch {
 		var frameChunk = frameChunks[fCNum];
 		var writeFile;
 		var bigList = List.fill(chunkSize, {0});
-
-		tanWindows.postln;
-		fftCosTables.postln;
 
 		("Chan Num: "++chanNum).postln;
 		("Chunk "++(fCNum)++" of "++(frameChunks.size-1)).postln;
@@ -194,14 +238,17 @@ TimeStretch {
 
 
 			numFrames.do{|frameNum|
-				//fCNum.postln; chunkSize.postln;
 				pointer = (fCNum*(chunkSize/durMult))+(frameNum*step);
-				//(pointer+windowSize-1).postln;
 				if(fftType==0){
-					arrayB = this.phaseRando(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
-				}{
 					arrayB = this.phaseRandoRFFT(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
+				}{
+					arrayB = this.phaseRando(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
 				};
+				while({arrayB[0].isNaN}, {
+					"array is NaN, going again".postln;
+						//arrayB = this.phaseRandoRFFT(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
+					arrayB.postln;
+					});
 
 				smallArrays = [arrayA.copyRange((windowSize/2).asInteger, windowSize-1), arrayB.copyRange(0, (windowSize/2).asInteger-1)];
 
@@ -222,6 +269,7 @@ TimeStretch {
 		};
 
 		writeFile = tempDir++PathName(outFolder).folderName++"_"++chanNum++"_"++fCNum++".wav";
+		writeFile.postln;
 
 		Buffer.loadCollection(server, bigList, 1, {|finalBuf0|
 			"time: ".post;

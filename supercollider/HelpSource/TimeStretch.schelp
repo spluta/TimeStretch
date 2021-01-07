@@ -72,10 +72,6 @@ Goes on to merge the chunks into a single file upon completion.
 
 method::mergeFiles
 
-argument::server
-
-A server. Will boot if it isn't booted.
-
 argument::folder
 
 The folder to look in to find the temporary file chunks.
