@@ -167,7 +167,7 @@ TimeStretch {
 
 		windowSizeList.do{|windowSize|
 			temp = List.newClear(0);
-			(0, 0.01..0.3).do{|correlation|
+			(0, 0.01..1.0).do{|correlation|
 				if(winType==0){
 					window = Signal.newClear(windowSize).waveFill({|fs|
 						fs = (fs*pi/2).tan**2;
@@ -175,7 +175,6 @@ TimeStretch {
 					}, 0, 2);
 
 				}{
-
 					window = Signal.newClear(windowSize/2).waveFill({|fs|
 						var phi, denom;
 						phi = pi*fs/2;
@@ -264,7 +263,8 @@ TimeStretch {
 
 				if(correlation<0){arrayB = arrayB.neg};
 
-				fftWind = tanWindows[windowSize.asInteger.asSymbol][correlation.abs.linlin(0, 0.3, 0, 29).asInteger];
+				//if(correlation.abs>0.5){(correlation+correlation.abs.linlin(0, 0.99, 0, 99).asInteger).postln};
+				fftWind = tanWindows[windowSize.asInteger.asSymbol][correlation.abs.linlin(0, 0.99, 0, 99).asInteger];
 				addArray = ((smallArrays[0]*fftWind[1])+(arrayB.copyRange(0, (windowSize/2).asInteger-1)*fftWind[0]));
 				addArray.do{|item, i|
 					var index = (frameNum*(windowSize/2))+i;
@@ -419,7 +419,7 @@ TimeStretch {
 		}
 	}
 
-	/**mergeFiles {|folder, numChans=2|
+	*mergeFiles {|folder, numChans=2|
 		var serverNum, server;
 		serverNum = 57110+NRT_Server_Inc.next;
 		while(
@@ -497,6 +497,6 @@ TimeStretch {
 			}
 			};
 		};
-	}*/
+	}
 
 }
