@@ -6,7 +6,7 @@ categories::  UGens>FFT
 Description::
 TimeStretch is the classic Cadillac of extreme time stretching algorithms - a big, hulking, and slow beauty. All calculations and audio processing are done in the language, thus calculations move at a glacial pace. For a faster version that uses the server, but doesn't sound quite as good, check out TimeStretch2.
 
-For transient splitting and file methodology, requires the FluCoMa Fluid Decomposition Toolbox.
+For transient splitting and file methodology, requires the FluCoMa Fluid Decomposition Toolbox (flucoma.org).
 
 Implements a phase randomized FFT time stretch algorithm, the NessStretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
