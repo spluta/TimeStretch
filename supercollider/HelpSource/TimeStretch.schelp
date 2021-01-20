@@ -1,12 +1,14 @@
 class:: TimeStretch
 summary:: Time Stretch
-related:: TimeStretch2, Classes/FFT, Classes/IFFT, Classes/PV_Diffuser, Classes/PV_BrickWall
+related:: TimeStretch2, Classes/FFT, Classes/IFFT, FluidTransients, FluidBufCompose
 categories::  UGens>FFT
 
 Description::
-TimeStretch is the classic Cadillac of time stretching algorithms - a big, hulking, and slow beauty. All calculations and audio processing are done in the language, thus calculations move at a glacial pace. For a faster version that uses the server, but doesn't sound quite as good, check out TimeStretch2.
+TimeStretch is the classic Cadillac of extreme time stretching algorithms - a big, hulking, and slow beauty. All calculations and audio processing are done in the language, thus calculations move at a glacial pace. For a faster version that uses the server, but doesn't sound quite as good, check out TimeStretch2.
 
-Implements a phase randomized FFT time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
+For transient splitting and file methodology, requires the FluCoMa Fluid Decomposition Toolbox.
+
+Implements a phase randomized FFT time stretch algorithm, the NessStretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
 0-86hz : 65536
 
@@ -44,9 +46,6 @@ argument::outFolder
 
 Path to the temporary destination output folder. Will create the folder if it does not exist.
 
-argument::dur
-
-The duration of the sound file to be stretched. -1 will process the entire file;
 
 argument::durMult
 
@@ -56,35 +55,79 @@ argument::chanArray
 
 An array that indicates which channels of the inFile to process.
 
-argument:: chunkSize
-
-The program will break the incoming audio into multiple output files, each with chunkSize samples. These files will go into a directory named after the name given to the outFile.
-
 argument:: startFrame
 
 Default is 0. This is the frame to start processing on. If the process has already made a number of frames, and was interrupted somehow, the process can be started in the middle by indicating here the last chunk that was successfully written to disk.
 
-argument:: fftType
+argument:: splits
 
-Whether to use an (0) Real-FFT or (1) FFT. Real-FFT is default and is considerably faster than FFT.
+By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below nyquist, then subsequent octaves down from there, leaving everything below the last split to the largest buffer. However, for files of transients, you may want to approach this differently. A number smaller than 9 will leave the top N octaves "normal", but will stop at the number provided. So, a 4 would have a max window size of 2048. An Array can also be provided. All values in the array need to be powers of 2, so something like [65536, 32768, 16384, 8192] will work.
 
-argument:: winType
+argument:: chunkSize
 
-Whether to use an (0) Tan^2 window or (1) Tan window. Tan^2 (NessWindow) is default. It provides a smoother output. They both have their charms.
+The program will break the incoming audio into multiple output files, each with chunkSize samples. These files will go into a directory named after the name given to the outFile.
 
-argument:: merge
+method::transientSeparation
 
-Goes on to merge the chunks into a single file upon completion. This can also be accomplished
+A convenience method for transient separation. This is a very aggressive setting, which should work for most sources.
 
-method::mergeFiles
+argument::inFile
 
-argument::folder
+The file to separate.
 
-The folder to look in to find the temporary file chunks.
+argument::resFileOut
 
-argument::numChans
+The file that will contain the resonance.
 
-The number of channels to merge into the final audio file.
+argument::transFileOut
+
+The file that will contain the transients.
+
+method::stretchResonAndTrans
+
+argument::resFile
+
+The file that contains the resonance.
+
+argument::transFile
+
+The file that contains the transients.
+
+argument::durMult
+
+See above.
+
+argument::chanArray
+
+See above.
+
+argument:: startFrame
+
+See above.
+
+argument:: splits
+
+See above for a discussion about splits. However, here you can give different numbers for the resonace and transients. So [9, 4], which is recommended, splits the resonance into 9 registers and the transients into 4 registers.
+
+argument:: chunkSize
+
+See above.
+
+method::mergeResonAndTrans
+
+Merges the resonance and transient folders into three files: resonance, transients, and both merged together. The outfile names will be derived from the directory names.
+
+argument::resDir
+
+Path to the resonance director.
+
+argument::transDir
+
+Path to the transients director.
+
+argument::numChannels
+
+Number of channels to look for and merge (ie, number of channels in the original file).
 
 Examples::
 
@@ -101,5 +144,17 @@ TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.rec
 //merge the files in the temporary folder into one file (requires FluidBufCompose from the FluCoMa library)
 //the method is commented out in the source code. To uncomment, go to the TimeStretch.sc file and uncomment the *mergeFiles method
 TimeStretch.mergeFiles(s, Platform.recordingsDir +/+ "a11wlk01_10_render/", 1)
+
+
+//further convenience methods
+//separates the sound file into resonant and transient components
+TimeStretch.transientSeparation("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt.wav");
+
+//stretches both the resonance and transient components separately
+//for a two channel file, will open up 4 instances of the language in the terminal and stretch the channels of the two files individually
+TimeStretch.stretchResonAndTrans("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_resonance.wav", "/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_transients.wav", 100, [0,1], 0, [9, 4]);
+
+//merge the resonance and transients folders into single files for each and also a single file which mixes the two
+TimeStretch.mergeResonAndTrans("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_resonance/","/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_transients/")
 
 ::
