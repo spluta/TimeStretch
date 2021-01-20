@@ -85,6 +85,8 @@ The file that will contain the transients.
 
 method::stretchResonAndTrans
 
+Stretches a resonance file and transients file into separate folders.
+
 argument::resFile
 
 The file that contains the resonance.
@@ -115,7 +117,7 @@ See above.
 
 method::mergeResonAndTrans
 
-Merges the resonance and transient folders into three files: resonance, transients, and both merged together. The outfile names will be derived from the directory names.
+Merges the resonance and transients folders into three files: resonance, transients, and both merged together. The outfile names will be derived from the directory names.
 
 argument::resDir
 
