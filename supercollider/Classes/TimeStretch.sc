@@ -305,14 +305,16 @@ TimeStretch {
 				r1 = Buffer.new(server);
 				t2 = Buffer.new(server);
 				r2 = Buffer.new(server);
+				"separating".postln;
 				FluidBufTransients.process(server, buffy, 0, -1, 0, -1, t1, r1, 40, 1024, 256, 10, 2, 1.1, 14, 25,
 					action:{|trans, res|
+						"separating again".postln;
 						FluidBufTransients.process(server, res, 0, -1, 0, -1, t2, r2, 40, 512, 256, 10, 2, 1.1, 14, 25,
 							action:{|trans2, res2|
-
 								res2.write(resFileOut);
 								FluidBufCompose.process(server, trans, destination:trans2, destGain:1, action:{|finTrans|
 									{
+										"putting back together".postln;
 										finTrans.write(transFileOut);
 										server.sync;
 										server.quit;
@@ -556,7 +558,7 @@ TimeStretch {
 		};
 	}
 
-	*mergeResonAndTrans {|resDir, transDir, numChans=2|
+	*mergeResonAndTrans {|outFile, resDir, transDir, numChans=2|
 
 		this.getServer;
 
@@ -625,7 +627,7 @@ TimeStretch {
 					//finalBuf.duration.postln; finalBuf.numChannels.postln;
 					if((finalBuf.duration*finalBuf.numChannels)>5000){outType="w64"}{outType="wav"};
 
-					finalBuf.write(PathName(resDir.copyRange(0, resDir.size-2)).pathOnly++PathName(resDir).folderName++"_long."++outType, outType, "int24");
+					finalBuf.write(PathName(outFile).pathOnly++PathName(outFile).fileNameWithoutExtension++"."++outType, outType, "int24");
 					finalRes.write(PathName(resDir.copyRange(0, resDir.size-2)).pathOnly++PathName(resDir).folderName++"_long_resonance."++outType, outType, "int24");
 					finalTrans.write(PathName(transDir.copyRange(0, transDir.size-2)).pathOnly++PathName(transDir).folderName++"_long_transients."++outType, outType, "int24");
 					server.sync;

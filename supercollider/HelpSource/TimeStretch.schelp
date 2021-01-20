@@ -119,6 +119,10 @@ method::mergeResonAndTrans
 
 Merges the resonance and transients folders into three files: resonance, transients, and both merged together. The outfile names will be derived from the directory names.
 
+argument::outFile
+
+Path to the main output file.
+
 argument::resDir
 
 Path to the resonance director.
