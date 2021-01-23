@@ -52,10 +52,10 @@ NRT_Server_Inc {
 }
 
 TimeStretch {
-	classvar <>tanWindows, <>fftCosTables, <>hannWindows, startTime;
+	classvar <>tanWindows, <>linkwitzRileyWindows, <>fftCosTables, <>hannWindows, startTime;
 	classvar serverNum, server;
 
-	*phaseRandoFFT {|array, lowBin, highBin|
+	*phaseRandoFFT {|array, lowBin, highBin, linkwitzRileyWindow, filterOrder|
 		var real, imag, cosTable, phase, rando, complex, complex2, ifft, size, hann, mags, mags2, bins, idft, real2, imag2, spectrum, phases2;
 
 		size = array.size;
@@ -76,10 +76,15 @@ TimeStretch {
 
 		mags = complex.magnitude.deepCopy.asList;
 
-		phases2 = complex.phase.deepCopy.asList;
+		phases2 = complex.phase.copyRange(0, (size/2).asInteger).asList;
 
-		mags2 = Array.fill(mags.size, {0});
-		(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
+		if(filterOrder<129){
+			mags2 = mags*linkwitzRileyWindow;
+			(0..(bins-1)).do{|i| phases2.put(i, pi.rand)};
+		}{
+			mags2 = Array.fill(mags.size, {0});
+			(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
+		};
 
 		spectrum.magnitude_(mags2.asArray);
 		spectrum.phase_(phases2.asArray);
@@ -89,7 +94,7 @@ TimeStretch {
 	}
 
 
-	*phaseRandoRFFT {|array, lowBin, highBin|
+	*phaseRandoRFFT {|array, lowBin, highBin, linkwitzRileyWindow, filterOrder|
 		var real, imag, cosTable, phase, rando, complex, complex2, ifft, size, hann, mags, mags2, bins, idft, real2, imag2, spectrum, phases2;
 
 		size = array.size;
@@ -108,8 +113,13 @@ TimeStretch {
 
 		phases2 = complex.phase.copyRange(0, (size/2).asInteger).asList;
 
-		mags2 = Array.fill(mags.size, {0});
-		(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
+		if(filterOrder<129){
+			(0..(bins-1)).do{|i| phases2.put(i, pi.rand)};
+			mags2 = mags*linkwitzRileyWindow;
+		}{
+			mags2 = Array.fill(mags.size, {0});
+			(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
+		};
 
 		spectrum = Polar(mags2, phases2.asArray);
 
@@ -125,6 +135,7 @@ TimeStretch {
 		(8..0).collect{|i|
 			windowSizeList.add(2**(8+i));
 		};
+
 		switch(winType,
 			0, {
 				"Ness Window".postln;
@@ -188,11 +199,11 @@ TimeStretch {
 		}
 	}
 
-	*processChunk {|server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=0, binShift = 0|
+	*processChunk {|server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=0, binShift = 0, filterOrder=129|
 		var frameChunk = frameChunks[fCNum];
 		var writeFile;
 		var bigList = /*List.fill(chunkSize+(maxWindowSize*durMult), {0});*/List.fill(chunkSize, {0});
-		var binShiftSamples;
+		var binShiftSamples, linkwitzRileyWindow;
 
 		("Chan Num: "++chanNum).postln;
 		("Chunk "++(fCNum)++" of "++(frameChunks.size-1)).postln;
@@ -204,7 +215,9 @@ TimeStretch {
 			if(num==0){lowBin=0; highBin = 127}{lowBin=64; highBin = 127};
 			lowBin.post;" ".post;highBin.postln;
 
+
 			windowSize = windowSizes[num];
+			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0}));
 			"num ".post;
 			num.postln;
 			"winSize ".post;
@@ -237,14 +250,14 @@ TimeStretch {
 				/*			numFrames.do{|frameNum|
 				pointer = (fCNum*(chunkSize/durMult))+(frameNum*step);*/
 				if(fftType==0){
-					arrayB = this.phaseRandoRFFT(tempArray, lowBin, highBin);
+					arrayB = this.phaseRandoRFFT(tempArray, lowBin, highBin, linkwitzRileyWindow, filterOrder);
 				}{
-					arrayB = this.phaseRando(tempArray, lowBin, highBin);
+					arrayB = this.phaseRandoFFT(tempArray, lowBin, highBin, linkwitzRileyWindow, filterOrder);
 				};
 				while({arrayB[0].isNaN}, {
 					"array is NaN, going FFT".postln;
-					arrayB = this.phaseRandoFFT(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin);
-					arrayB.postln;
+					arrayB = this.phaseRandoFFT(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin, linkwitzRileyWindow, filterOrder);
+					//arrayB.postln;
 				});
 
 				smallArrays = [arrayA.copyRange((windowSize/2).asInteger, windowSize-1), arrayB.copyRange(0, (windowSize/2).asInteger-1)];
@@ -279,7 +292,7 @@ TimeStretch {
 			if(fCNum<frameChunks.size){
 				"next Chunk".postln;
 
-				this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType, binShift);
+				this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType, binShift, filterOrder);
 			}{
 				"doneWChannel".postln;
 				NetAddr("127.0.0.1", NetAddr.langPort).sendMsg(("/"++serverNum).asSymbol, "process next chan");
@@ -288,51 +301,12 @@ TimeStretch {
 
 	}
 
-	*transientSeparation {|inFile, resFileOut, transFileOut|
-		var t1, t2, r1, r2, buf;
-		var fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
-
-		this.getServer;
-
-		if(resFileOut==nil){resFileOut = fileName++"_resonance.wav"};
-		if(transFileOut==nil){transFileOut = fileName++"_transients.wav"};
-
-		server.waitForBoot{
-
-			buf = Buffer.read(server, inFile, action:{|buffy|
-
-				t1 = Buffer.new(server);
-				r1 = Buffer.new(server);
-				t2 = Buffer.new(server);
-				r2 = Buffer.new(server);
-				"separating".postln;
-				FluidBufTransients.process(server, buffy, 0, -1, 0, -1, t1, r1, 40, 1024, 256, 10, 2, 1.1, 14, 25,
-					action:{|trans, res|
-						"separating again".postln;
-						FluidBufTransients.process(server, res, 0, -1, 0, -1, t2, r2, 40, 512, 256, 10, 2, 1.1, 14, 25,
-							action:{|trans2, res2|
-								res2.write(resFileOut);
-								FluidBufCompose.process(server, trans, destination:trans2, destGain:1, action:{|finTrans|
-									{
-										"putting back together".postln;
-										finTrans.write(transFileOut);
-										server.sync;
-										server.quit;
-										server = nil;
-									}.fork;
-								})
-						})
-				});
-			});
-		}
-	}
-
 	*getServer{
 		if(server==nil){
 			serverNum = 57110+NRT_Server_Inc.next;
 			while(
 				{("lsof -i:"++serverNum++" ").unixCmdGetStdOut.size > 0},
-				{serverNum = 57110+NRT_Server_Inc.next; serverNum.postln}
+				{serverNum = 57100+NRT_Server_Inc.next; serverNum.postln}
 			);
 
 			("server id: "++serverNum).postln;
@@ -342,28 +316,25 @@ TimeStretch {
 		};
 	}
 
-	*mkStretchTemp{|path, inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600|
+	*mkStretchTemp{|path, inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600, filterOrder=129|
 		var file = File(path, "w");
 
-		file.write("TimeStretch.stretch("++inFile.quote++", "++outFolder.quote++", "++durMult++", "++chanArray++", 0, "++splits++", "++chunkSize++");");
+		file.write("TimeStretch.stretch("++inFile.quote++", "++outFolder.quote++", "++durMult++", "++chanArray++", 0, "++splits++", "++chunkSize++", "++filterOrder++");");
 		file.close;
 	}
 
-	*stretchResonAndTrans {|resFile, transFile, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600|
+	*stretch2PlusChannels {|inFile, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600, filterOrder=129|
+		var fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
 
-		if(splits.size==0){splits = splits.dup};
+		if(chanArray==nil){chanArray = Array.fill(SoundFile.openRead(inFile).numChannels, {|i| i})};
 
-		[resFile, transFile].do{|which, i|
-			var fileName = PathName(which).pathOnly++PathName(which).fileNameWithoutExtension;
-			//fileName.postln;
-			chanArray.do{|chan, i2|
-				TimeStretch.mkStretchTemp(fileName++"_"++chan++".scd", fileName++".wav", fileName++"/", durMult, [chan], startFrame, splits[i], chunkSize);
-				AppClock.sched((10*i2)+(20*i), {("sclang "++fileName++"_"++chan++".scd").postln.runInTerminal});
-			}
+		chanArray.do{|chan, i2|
+			TimeStretch.mkStretchTemp(fileName++"_"++chan++".scd", inFile, fileName++"_"++durMult++"/", durMult, [chan], startFrame, splits, chunkSize, filterOrder);
+			AppClock.sched((10*i2), {("sclang "++fileName++"_"++chan++".scd").postln.runInTerminal});
 		}
 	}
 
-	*stretch {|inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600|
+	*stretch {|inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600, filterOrder=129|
 		var fftType=0, winType=0, binShift=0, merge=0, maxWindowSize = 65536, windowSizes;
 
 		this.getServer;
@@ -457,7 +428,7 @@ TimeStretch {
 			Buffer.readChannel(server, inFile, 0, -1, [chanNum], {|buffer|
 				buffer.loadToFloatArray(action:{|floatArray|
 					floatArray = floatArray.addAll(FloatArray.fill(maxWindowSize*2, {0}));
-					this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, fftType, binShift);
+					this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, fftType, binShift, filterOrder);
 				});
 			});
 
@@ -471,7 +442,7 @@ TimeStretch {
 					Buffer.readChannel(server, inFile, 0, -1, [chanCount], {|buffer|
 						buffer.loadToFloatArray(action:{|floatArray|
 							floatArray = floatArray.addAll(FloatArray.fill(maxWindowSize, {0}));
-							this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, fftType, binShift);
+							this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, fftType, binShift, filterOrder);
 						});
 					});
 				}{
@@ -487,165 +458,6 @@ TimeStretch {
 		}
 	}
 
-	*merge {|folder, numChans=2|
 
-		this.getServer;
-
-		server.waitForBoot{
-			var files, channels, chunkSize;
-
-
-			var buffers, counter, doit;
-
-			var finalBuf = Buffer(server);
-
-
-
-			if(folder.last.asString!="/"){folder = folder++"/"};
-			//folder.postln;
-			folder = PathName(folder);
-
-			files = folder.files.select{arg file; file.extension=="wav"};
-
-			files = files.sort({arg a, b; var c, d;
-				c = a.fileNameWithoutExtension;
-				c = c.copyRange(c.findAll("_").last+1, c.size-1).asInteger;
-				d = b.fileNameWithoutExtension;
-				d = d.copyRange(d.findAll("_").last+1, d.size-1).asInteger;
-				c<d});
-
-			files.do{|file|file.postln};
-			channels = numChans.collect{|chan| files.select{arg file; file.fullPath.contains("_"++chan++"_")}};
-
-			chunkSize = SoundFile.openRead(files[0].fullPath).numFrames;
-
-			"merge files!".postln;
-			//FluidBufCompose.process(server, buffers[0][0], 0, -1, 0, -1, 1, finalBuf, 0, 0, 0,  action:{doit0.value(0, 0)});
-
-			doit = {Routine{
-				server.sync;
-				buffers.do{|chan, i|
-					chan.do{|buf, i2|
-						//("chan:"+i+"buffer"+i2).postln;
-						"merging buffers...may take a while".postln;
-						FluidBufCompose.processBlocking(server, buf, 0, -1, 0, -1, 1, finalBuf, i2*chunkSize, i, 0, true, {("chan:"+i+"buffer"+i2).postln}).wait;
-
-					};
-				};
-				server.sync;
-				"write file".postln;
-				//server.sync;
-				finalBuf.query;
-				server.sync;
-				finalBuf.duration.postln; finalBuf.numChannels.postln;
-				if((finalBuf.duration*finalBuf.numChannels)>5000){
-					//"w64".postln;
-					finalBuf.write(folder.parentPath++folder.folderName++".w64", "w64", "int24");
-					server.quit;
-				}{
-					finalBuf.write(folder.parentPath++folder.folderName++".wav", "wav", "int24");
-					server.quit;
-				}
-			}.play};
-			counter = 0;
-			buffers = channels.collect{|chan| chan.collect{|file| Buffer.read(server, file.fullPath, 0, -1, {
-				counter = counter+1;
-				counter.postln;
-				if(counter==files.size){"buffers loaded".postln; doit.value};
-			})
-			}
-			};
-		};
-	}
-
-	*mergeResonAndTrans {|outFile, resDir, transDir, numChans=2|
-
-		this.getServer;
-
-		server.waitForBoot{
-			var files, filesArray, channels, chunkSize;
-
-
-			var buffers, counter, doit, outType;
-
-			var finalBuf = Buffer(server);
-			var finalRes = Buffer(server);
-			var finalTrans = Buffer(server);
-
-			filesArray = [resDir, transDir].collect{|which, i|
-				var folder = PathName(which).pathOnly++PathName(which).fileNameWithoutExtension;
-
-				if(folder.last.asString!="/"){folder = folder++"/"};
-				//folder.postln;
-				folder = PathName(folder);
-
-				files = folder.files.select{arg file; file.extension=="wav"};
-
-				files = files.sort({arg a, b; var c, d;
-					c = a.fileNameWithoutExtension;
-					c = c.copyRange(c.findAll("_").last+1, c.size-1).asInteger;
-					d = b.fileNameWithoutExtension;
-					d = d.copyRange(d.findAll("_").last+1, d.size-1).asInteger;
-					c<d});
-
-				//files.do{|file|file.postln};
-				channels = numChans.collect{|chan| files.select{arg file; file.fullPath.contains("_"++chan++"_")}};
-
-				chunkSize = SoundFile.openRead(files[0].fullPath).numFrames;
-				channels
-			};
-
-			//filesArray.size.postln;
-			//filesArray[0].postln;
-			//filesArray[1].postln;
-
-			"merge files!".postln;
-
-			doit = {
-				Routine{
-					server.sync;
-					buffers.do{|filesArray, fileNum|
-						filesArray.do{|chan, i|
-							chan.do{|buf, i2|
-								("fileNum:"+fileNum+"chan:"+i+"buffer"+i2).postln;
-								"merging buffers...may take a while".postln;
-								FluidBufCompose.processBlocking(server, buf, 0, -1, 0, -1, 1, finalBuf, i2*chunkSize, i, 1, true, {("chan:"+i+"buffer"+i2).postln}).wait;
-								if(fileNum==0){
-									FluidBufCompose.processBlocking(server, buf, 0, -1, 0, -1, 1, finalRes, i2*chunkSize, i, 1, true).wait;
-								}{
-									FluidBufCompose.processBlocking(server, buf, 0, -1, 0, -1, 1, finalTrans, i2*chunkSize, i, 1, true).wait;
-								}
-							};
-
-						}
-					};
-					server.sync;
-					"write file".postln;
-					//server.sync;
-					finalBuf.query;
-					server.sync;
-					//finalBuf.duration.postln; finalBuf.numChannels.postln;
-					if((finalBuf.duration*finalBuf.numChannels)>5000){outType="w64"}{outType="wav"};
-
-					finalBuf.write(PathName(outFile).pathOnly++PathName(outFile).fileNameWithoutExtension++"."++outType, outType, "int24");
-					finalRes.write(PathName(resDir.copyRange(0, resDir.size-2)).pathOnly++PathName(resDir).folderName++"_long_resonance."++outType, outType, "int24");
-					finalTrans.write(PathName(transDir.copyRange(0, transDir.size-2)).pathOnly++PathName(transDir).folderName++"_long_transients."++outType, outType, "int24");
-					server.sync;
-					server.quit;
-			}.play};
-
-			counter = 0;
-			buffers = filesArray.collect{|channels, fileNum|
-				channels.collect{|chan| chan.collect{|file, chanNum|
-					//[fileNum,chanNum].postln;
-					Buffer.read(server, file.fullPath, 0, -1, {
-						counter = counter+1;
-						if(counter==(files.size*2)){"buffers loaded".postln; doit.value};
-					})
-				}
-				};
-			}
-		};
-	}
 
 }

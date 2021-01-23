@@ -67,25 +67,57 @@ argument:: chunkSize
 
 The program will break the incoming audio into multiple output files, each with chunkSize samples. These files will go into a directory named after the name given to the outFile.
 
+argument:: filterOrder
+
+By default the filter will be a brickwall fft bandpass filter separating frequency bands. However, by giving filterOrder a number 128 and below, the program switches to a Linkwitz-Riley filter with the order number provided.
+
+method::stretch2PlusChannels
+
+Stretches a stereo+ audio file into chunked audio files in a single folder. Will open two instances of sclang in the terminal to stretch these independently.
+
+inFile, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600|
+
+argument::inFile
+
+The file to stretch.
+
+argument::durMult
+
+See above.
+
+argument::chanArray
+
+See above.
+
+argument:: startFrame
+
+See above.
+
+argument:: splits
+
+See above.
+
+argument:: chunkSize
+
+See above.
+
+argument:: filterOrder
+
+See above.
+
 method::transientSeparation
 
-A convenience method for transient separation. This is a very aggressive setting, which should work for most sources.
+A convenience method for transient separation. This is a very aggressive setting, which should work for most sources. Will create a temporary directory in the folder of the inFile, and place the separated files there.
+
+Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
 
 argument::inFile
 
 The file to separate.
 
-argument::resFileOut
-
-The file that will contain the resonance.
-
-argument::transFileOut
-
-The file that will contain the transients.
-
 method::stretchResonAndTrans
 
-Stretches a resonance file and transients file into separate folders.
+Stretches a resonance file and transients file in the tempDir created by this.transientSeparation into separate folders in that same directory.
 
 argument::resFile
 
@@ -115,9 +147,31 @@ argument:: chunkSize
 
 See above.
 
+argument:: filterOrder
+
+See above.
+
+method::merge
+
+Merges the provided folder into a stereo file. Will output a wav file if possible, but a w64 if the resulting file will be too large for the wav format.
+
+Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
+
+argument:: folder
+
+Folder containing the stretched audio segments.
+
+argument:: numChans
+
+Number of channels in the original audio file.
+
+Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
+
 method::mergeResonAndTrans
 
 Merges the resonance and transients folders into three files: resonance, transients, and both merged together. The outfile names will be derived from the directory names.
+
+Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
 
 argument::outFile
 
@@ -153,14 +207,14 @@ TimeStretch.mergeFiles(s, Platform.recordingsDir +/+ "a11wlk01_10_render/", 1)
 
 
 //further convenience methods
-//separates the sound file into resonant and transient components
+//separates the sound file into resonant and transient components and places these in a temporary directory
 TimeStretch.transientSeparation("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt.wav");
 
 //stretches both the resonance and transient components separately
 //for a two channel file, will open up 4 instances of the language in the terminal and stretch the channels of the two files individually
-TimeStretch.stretchResonAndTrans("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_resonance.wav", "/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_transients.wav", 100, [0,1], 0, [9, 4]);
+TimeStretch.stretchResonAndTrans("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt.wav", 100, [0,1], 0, [9, 4]);
 
 //merge the resonance and transients folders into single files for each and also a single file which mixes the two
-TimeStretch.mergeResonAndTrans("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_resonance/","/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt_transients/")
+TimeStretch.mergeResonAndTrans("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt.wav")
 
 ::
