@@ -105,6 +105,22 @@ argument:: filterOrder
 
 See above.
 
+method::merge
+
+Merges the provided folder into a stereo file. Will output a wav file if possible, but a w64 if the resulting file will be too large for the wav format.
+
+Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
+
+argument:: folder
+
+Folder containing the stretched audio segments.
+
+argument:: numChans
+
+Number of channels in the original audio file.
+
+Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
+
 method::transientSeparation
 
 A convenience method for transient separation. This is a very aggressive setting, which should work for most sources. Will create a temporary directory in the folder of the inFile, and place the separated files there.
@@ -117,15 +133,11 @@ The file to separate.
 
 method::stretchResonAndTrans
 
-Stretches a resonance file and transients file in the tempDir created by this.transientSeparation into separate folders in that same directory.
+Stretches a resonance file and transients file in the tempDir created by TimeStretch.transientSeparation into separate folders in that same directory.
 
-argument::resFile
+argument::inFile
 
-The file that contains the resonance.
-
-argument::transFile
-
-The file that contains the transients.
+The file that has been split by TimeStretch.transientSeparation
 
 argument::durMult
 
@@ -151,21 +163,6 @@ argument:: filterOrder
 
 See above.
 
-method::merge
-
-Merges the provided folder into a stereo file. Will output a wav file if possible, but a w64 if the resulting file will be too large for the wav format.
-
-Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
-
-argument:: folder
-
-Folder containing the stretched audio segments.
-
-argument:: numChans
-
-Number of channels in the original audio file.
-
-Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
 
 method::mergeResonAndTrans
 
@@ -173,17 +170,9 @@ Merges the resonance and transients folders into three files: resonance, transie
 
 Commented out in the TimeStretchFluidExtensions.sc file. Requires the FluCoMa library for SC. Download this library, uncomment and recompile to use this.
 
-argument::outFile
+argument::inFile
 
-Path to the main output file.
-
-argument::resDir
-
-Path to the resonance director.
-
-argument::transDir
-
-Path to the transients director.
+The file that has been split by TimeStretch.transientSeparation and stretched by TimeStretch.stretchResonAndTrans. The output file will have this same name with "_long" at the end.
 
 argument::numChannels
 
