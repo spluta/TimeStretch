@@ -24,23 +24,24 @@ def r2p(x):
 
 class AnalysisBand(object):
     def __init__(self, nfft, low_bin, high_bin, synthesis_window, phase_mode, nonnegative_phases, overlap):
+        # analysis variables
+        self.nfft = nfft
+        self.nrfft = nfft // 2 + 1        
         # windowing
         self.analysis_window_array = scipy.signal.get_window('hann', nfft)
         self.synthesis_window = synthesis_window
         if self.synthesis_window in rwindow.variable_window_funcs.keys():
+            self.overlap = 2
+            self.hop_size = nfft // self.overlap
             self.variable_window = True
             window_func = rwindow.variable_window_funcs[synthesis_window]
             self.xfade_table = window_func(self.hop_size)
             self.xfade_buffer = np.zeros(self.hop_size)
-            self.overlap = 2
         else:
+            self.overlap = overlap
+            self.hop_size = nfft // self.overlap
             self.variable_window = False
             self.synthesis_window_array = scipy.signal.get_window(self.synthesis_window, nfft)
-            self.overlap = overlap
-        # analysis variables
-        self.nfft = nfft
-        self.nrfft = nfft // 2 + 1
-        self.hop_size = nfft // self.overlap
         # bandpass bins
         self.low_bin = low_bin
         self.high_bin = high_bin
