@@ -63,19 +63,13 @@ argument:: splits
 
 By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below nyquist, then subsequent octaves down from there, leaving everything below the last split to the largest buffer. However, for files of transients, you may want to approach this differently. A number smaller than 9 will leave the top N octaves "normal", but will stop at the number provided. So, a 4 would have a max window size of 2048. An Array can also be provided. All values in the array need to be powers of 2, so something like [65536, 32768, 16384, 8192] will work.
 
-argument:: chunkSize
-
-The program will break the incoming audio into multiple output files, each with chunkSize samples. These files will go into a directory named after the name given to the outFile.
-
 argument:: filterOrder
 
-By default the filter will be a brickwall fft bandpass filter separating frequency bands. However, by giving filterOrder a number 128 and below, the program switches to a Linkwitz-Riley filter with the order number provided.
+By default (value = 129) the filter will be a brickwall fft bandpass filter separating frequency bands. However, by giving filterOrder a number 128 and below, the program switches to a Linkwitz-Riley filter with the order number provided.
 
 method::stretch2PlusChannels
 
 Stretches a stereo+ audio file into chunked audio files in a single folder. Will open two instances of sclang in the terminal to stretch these independently.
-
-inFile, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600|
 
 argument::inFile
 
@@ -94,10 +88,6 @@ argument:: startFrame
 See above.
 
 argument:: splits
-
-See above.
-
-argument:: chunkSize
 
 See above.
 
@@ -154,10 +144,6 @@ See above.
 argument:: splits
 
 See above for a discussion about splits. However, here you can give different numbers for the resonace and transients. So [9, 4], which is recommended, splits the resonance into 9 registers and the transients into 4 registers.
-
-argument:: chunkSize
-
-See above.
 
 argument:: filterOrder
 
