@@ -24,4 +24,19 @@
 			^(this.linkwitzRileyLP(size, hiBin, order)*this.linkwitzRileyHP(size, lowBin, order));
 		}
 	}
+
+	*sineFillWFreqs {|size = 512, freqs=93.75, sampleRate = 44100|
+		var real, temp, sigSize, realz;
+		var root = sampleRate/size;
+
+		if(freqs.size==0){freqs = [freqs]};
+
+		realz = freqs.collect{|freq|
+			temp = freq/root;
+			sigSize = temp.ceil/temp;
+			real = Signal.sineFill((sigSize*size).postln, Array.fill(temp.ceil-1, {0}).add(1));
+			real.copyRange(0, size-1)
+		};
+		^realz.sum;
+	}
 }

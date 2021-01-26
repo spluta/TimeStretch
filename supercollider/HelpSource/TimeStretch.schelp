@@ -32,7 +32,7 @@ The algorithm also correlates each grain in the FFT with the previous and next g
 
 The mergeFiles method below requires FluidBufCompose from the  FluCoMa library. This method is commented out in the distro. Files can be merged in any DAW.
 
-classmethods::
+CLASSMETHODS::
 
 method::stretch
 

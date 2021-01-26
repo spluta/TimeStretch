@@ -55,76 +55,41 @@ TimeStretch {
 	classvar <>tanWindows, <>linkwitzRileyWindows, <>fftCosTables, <>hannWindows, startTime;
 	classvar serverNum, server;
 
-	*phaseRandoFFT {|array, lowBin, highBin, linkwitzRileyWindow, filterOrder|
-		var real, imag, cosTable, phase, rando, complex, complex2, ifft, size, hann, mags, mags2, bins, idft, real2, imag2, spectrum, phases2;
 
-		size = array.size;
-		bins = (size/2).asInteger;
-
-		hann = hannWindows[size.asSymbol];
-
-		real = array.as(Signal);
-		real = real*hann;
-
-		cosTable = fftCosTables[size.asSymbol];
-
-		imag = Signal.newClear(size);
-
-		complex = fft(real, imag, cosTable);
-
-		spectrum = FreqSpectrum.newComplex(complex);
+	*getPolar {|complex, lowBin, highBin, linkwitzRileyWindow, filterOrder|
+		var mags, mags2, phases2;
 
 		mags = complex.magnitude.deepCopy.asList;
 
-		phases2 = complex.phase.copyRange(0, (size/2).asInteger).asList;
-
 		if(filterOrder<129){
 			mags2 = mags*linkwitzRileyWindow;
-			(0..(bins-1)).do{|i| phases2.put(i, pi.rand)};
+			phases2 = complex.phase.collect{|phase, i| if(mags2[i]>0){pi.rand}{phase}};
 		}{
 			mags2 = Array.fill(mags.size, {0});
+			phases2 = complex.phase.deepCopy.asList;
 			(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
 		};
-
-		spectrum.magnitude_(mags2.asArray);
-		spectrum.phase_(phases2.asArray);
-
-		ifft = spectrum.real.ifft(spectrum.imag, cosTable);
-		^ifft.real
+		^Polar(mags2, phases2.asArray);
 	}
 
+	*phaseRandoDualRFFT{|arrayA, arrayB, lowBin, highBin, linkwitzRileyWindow, filterOrder|
+		var real1, real2, imag, rfftSize, cosTable, hann, polar1, polar2, complexDict, irfftDict;
 
-	*phaseRandoRFFT {|array, lowBin, highBin, linkwitzRileyWindow, filterOrder|
-		var real, imag, cosTable, phase, rando, complex, complex2, ifft, size, hann, mags, mags2, bins, idft, real2, imag2, spectrum, phases2;
+		rfftSize = arrayA.size/2+1;
+		cosTable = Signal.rfftTwoCosTable(rfftSize);
+		hann = hannWindows[arrayA.size.asSymbol];
 
-		size = array.size;
-		bins = (size/2).asInteger;
+		real1 = arrayA.as(Signal)*hann;
+		real2 = arrayB.as(Signal)*hann;
 
-		hann = hannWindows[size.asSymbol];
+		complexDict = rfftTwo(real1, real2, cosTable);
+		polar1 = this.getPolar(complexDict[\rfft1], lowBin, highBin, linkwitzRileyWindow, filterOrder);
+		polar2 = this.getPolar(complexDict[\rfft2], lowBin, highBin, linkwitzRileyWindow, filterOrder);
 
-		real = array.as(Signal);
-		real = real*hann;
 
-		cosTable = fftCosTables[size.asSymbol];
+		irfftDict = polar1.real.as(Signal).irfftTwo(polar1.imag.as(Signal), polar2.real.as(Signal), polar2.imag.as(Signal), cosTable);
 
-		complex = fft(real, nil, cosTable);
-
-		mags = complex.magnitude.copyRange(0, (size/2).asInteger).asList;
-
-		phases2 = complex.phase.copyRange(0, (size/2).asInteger).asList;
-
-		if(filterOrder<129){
-			(0..(bins-1)).do{|i| phases2.put(i, pi.rand)};
-			mags2 = mags*linkwitzRileyWindow;
-		}{
-			mags2 = Array.fill(mags.size, {0});
-			(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
-		};
-
-		spectrum = Polar(mags2, phases2.asArray);
-
-		ifft = spectrum.real.ifft(spectrum.imag, cosTable);
-		^ifft.real
+		^[irfftDict[\irfft1], irfftDict[\irfft2]]
 	}
 
 	*makeWindows {|winType=0|
@@ -199,17 +164,17 @@ TimeStretch {
 		}
 	}
 
-	*processChunk {|server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=0, binShift = 0, filterOrder=129|
+	*processChunk {|server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=1, binShift = 0, filterOrder=129|
 		var frameChunk = frameChunks[fCNum];
 		var writeFile;
-		var bigList = /*List.fill(chunkSize+(maxWindowSize*durMult), {0});*/List.fill(chunkSize, {0});
+		var bigList = List.fill(chunkSize, {0});
 		var binShiftSamples, linkwitzRileyWindow;
 
 		("Chan Num: "++chanNum).postln;
 		("Chunk "++(fCNum)++" of "++(frameChunks.size-1)).postln;
 
 		windowSizes.size.do{|num|
-			var correlations, getNext, windowSize, step, windowEnv, fftWind, numFrames, smallArrays, addArray, correlation, lowBin, highBin, pointer, tempArray;
+			var correlations, getNext, windowSize, step, windowEnv, fftWind, numFrames, smallArrays, addArray, correlation, lowBin, highBin, pointer, tempArray, frames;
 			var arrayA, arrayB;
 
 			if(num==0){lowBin=0; highBin = 127}{lowBin=64; highBin = 127};
@@ -217,13 +182,13 @@ TimeStretch {
 
 
 			windowSize = windowSizes[num];
-			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0}));
+			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);/*.addAll(Signal.fill(windowSize/2, {0}));*/
 			"num ".post;
 			num.postln;
 			"winSize ".post;
 			windowSize.postln;
 
-			numFrames = frameChunk/(windowSize/2); //not right
+			numFrames = frameChunk/(windowSize/2);
 
 			step = (windowSize/2)/durMult;
 			"step ".postln; step.postln;
@@ -238,7 +203,8 @@ TimeStretch {
 				binShiftSamples = 0;
 			}{binShiftSamples = ((windowSize/2)*binShift)-windowSizes.last};
 
-			numFrames.do{|frameNum|
+			frames = (0..(numFrames-1)).collect{|frameNum|
+				var tempArray;
 				pointer = (fCNum*(chunkSize/durMult))+(frameNum*step)-(windowSize/2+binShiftSamples);
 				if(pointer<0){
 					tempArray = floatArray.copyRange(0, (pointer.floor+windowSize).asInteger);
@@ -246,19 +212,13 @@ TimeStretch {
 				}{
 					tempArray = floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger);
 				};
+				tempArray
+			};
 
-				/*			numFrames.do{|frameNum|
-				pointer = (fCNum*(chunkSize/durMult))+(frameNum*step);*/
-				if(fftType==0){
-					arrayB = this.phaseRandoRFFT(tempArray, lowBin, highBin, linkwitzRileyWindow, filterOrder);
-				}{
-					arrayB = this.phaseRandoFFT(tempArray, lowBin, highBin, linkwitzRileyWindow, filterOrder);
-				};
-				while({arrayB[0].isNaN}, {
-					"array is NaN, going FFT".postln;
-					arrayB = this.phaseRandoFFT(floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger), lowBin, highBin, linkwitzRileyWindow, filterOrder);
-					//arrayB.postln;
-				});
+			frames = frames.clump(2);
+			frames = frames.collect{|frame| this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder)}.flatten;
+
+			frames.do{|arrayB, frameNum|
 
 				smallArrays = [arrayA.copyRange((windowSize/2).asInteger, windowSize-1), arrayB.copyRange(0, (windowSize/2).asInteger-1)];
 
@@ -267,7 +227,6 @@ TimeStretch {
 
 				if(correlation<0){arrayB = arrayB.neg};
 
-				//if(correlation.abs>0.5){(correlation+correlation.abs.linlin(0, 0.99, 0, 99).asInteger).postln};
 				fftWind = tanWindows[windowSize.asInteger.asSymbol][correlation.abs.linlin(0, 0.99, 0, 99).asInteger];
 				addArray = ((smallArrays[0]*fftWind[1])+(arrayB.copyRange(0, (windowSize/2).asInteger-1)*fftWind[0]));
 				addArray.do{|item, i|
@@ -316,27 +275,27 @@ TimeStretch {
 		};
 	}
 
-	*mkStretchTemp{|path, inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600, filterOrder=129|
+	*mkStretchTemp{|path, inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, filterOrder=129|
 		var file = File(path, "w");
 
-		file.write("TimeStretch.stretch("++inFile.quote++", "++outFolder.quote++", "++durMult++", "++chanArray++", 0, "++splits++", "++chunkSize++", "++filterOrder++");");
+		file.write("TimeStretch.stretch("++inFile.quote++", "++outFolder.quote++", "++durMult++", "++chanArray++", 0, "++splits++", "++filterOrder++");");
 		file.close;
 	}
 
-	*stretch2PlusChannels {|inFile, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600, filterOrder=129|
+	*stretch2PlusChannels {|inFile, durMult=100, chanArray, startFrame=0, splits = 9, filterOrder=129|
 		var fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
 
 		if(chanArray==nil){chanArray = Array.fill(SoundFile.openRead(inFile).numChannels, {|i| i})};
 
 		chanArray.do{|chan, i2|
-			TimeStretch.mkStretchTemp(fileName++"_"++chan++".scd", inFile, fileName++"_"++durMult++"/", durMult, [chan], startFrame, splits, chunkSize, filterOrder);
+			TimeStretch.mkStretchTemp(fileName++"_"++chan++".scd", inFile, fileName++"_"++durMult++"/", durMult, [chan], startFrame, splits, filterOrder);
 			AppClock.sched((10*i2), {("sclang "++fileName++"_"++chan++".scd").postln.runInTerminal});
 		}
 	}
 
-	*stretch {|inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, chunkSize = 6553600, filterOrder=129|
-		var fftType=0, winType=0, binShift=0, merge=0, maxWindowSize = 65536, windowSizes;
-
+	*stretch {|inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, filterOrder=129|
+		var fftType=1, winType=0, binShift=0, merge=0, maxWindowSize = 65536, windowSizes;
+		var chunkSize = 6553600, temp;
 		this.getServer;
 
 		if(splits.size==0){
@@ -372,14 +331,11 @@ TimeStretch {
 
 			totalFrames = numSamplesToProcess*durMult;
 
-			if(chunkSize<1){
-				chunkSize = totalFrames;
-				totalChunks = 1;
-				frameChunks = Array.fill(totalChunks.floor, {chunkSize});
-			}{
-				totalChunks = totalFrames/(chunkSize);
-				frameChunks = Array.fill(totalChunks.floor, {chunkSize}).add(totalFrames-(totalChunks.floor*chunkSize));
-			};
+			totalChunks = totalFrames/(chunkSize);
+			temp = totalFrames-(totalChunks.floor*chunkSize);
+			temp = ((temp/maxWindowSize).ceil*maxWindowSize).asInteger;
+			if(temp.odd){temp=temp+1};
+			frameChunks = Array.fill(totalChunks.floor, {chunkSize}).add(temp);
 
 			"Processing Chunks: ".post; totalChunks.postln;
 			"Frame Chunks: ".post; frameChunks.postln;
@@ -427,7 +383,9 @@ TimeStretch {
 
 			Buffer.readChannel(server, inFile, 0, -1, [chanNum], {|buffer|
 				buffer.loadToFloatArray(action:{|floatArray|
-					floatArray = floatArray.addAll(FloatArray.fill(maxWindowSize*2, {0}));
+					temp = frameChunks.sum-floatArray.size;
+					floatArray = floatArray.addAll(FloatArray.fill(temp, {0}));
+					floatArray.size.postln;
 					this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, fftType, binShift, filterOrder);
 				});
 			});
@@ -441,7 +399,9 @@ TimeStretch {
 					chanNum = chanArray[chanCount];
 					Buffer.readChannel(server, inFile, 0, -1, [chanCount], {|buffer|
 						buffer.loadToFloatArray(action:{|floatArray|
-							floatArray = floatArray.addAll(FloatArray.fill(maxWindowSize, {0}));
+							temp = frameChunks.sum-floatArray.size;
+							floatArray = floatArray.addAll(FloatArray.fill(temp, {0}));
+							floatArray.size.postln;
 							this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, fftType, binShift, filterOrder);
 						});
 					});
