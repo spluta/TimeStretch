@@ -331,11 +331,9 @@ TimeStretch {
 
 			totalFrames = numSamplesToProcess*durMult;
 
-			totalChunks = totalFrames/(chunkSize);
-			temp = totalFrames-(totalChunks.floor*chunkSize);
-			temp = ((temp/maxWindowSize).ceil*maxWindowSize).asInteger;
-			if(temp.odd){temp=temp+1};
-			frameChunks = Array.fill(totalChunks.floor, {chunkSize}).add(temp);
+
+			totalChunks = (totalFrames/(chunkSize)).ceil;
+			frameChunks = Array.fill(totalChunks, {chunkSize});
 
 			"Processing Chunks: ".post; totalChunks.postln;
 			"Frame Chunks: ".post; frameChunks.postln;
@@ -344,38 +342,11 @@ TimeStretch {
 			if(startFrame==0){
 				lastArrayA = List.newClear(9);
 			}{
-				if(startFrame>0){
 					var file;
 					("loading last array from frame"++startFrame).post;
 					file = (tempDir++"lastArrays/"++PathName(outFolder).folderName++"_"++chanArray[0]++"_"++(startFrame-1)++".lastArray").postln;
 					file.postln;
 					lastArrayA = Object.readArchive(file);
-				}{
-					var files, num, fileToLoad;
-					"loading last array ".post;
-					num = -1;
-					files = PathName(tempDir).files;
-					files.do{|file|
-						var temp;
-						temp = file.fileName.findAll("_");
-						temp = file.fileName.copyRange(temp[temp.size-2]+1, temp.last-1).asInteger;
-						temp.postln;
-						if(temp==chanArray[0]){
-							temp.postln;
-							temp = file.fileName.findAll("_").addAll(file.fileName.findAll("."));
-							temp = file.fileName.copyRange(temp[temp.size-2]+1, temp.last-1).asInteger;
-
-							if(temp>num){num=temp};
-
-					}};
-					startFrame = num+1;
-					if(startFrame>0){
-						fileToLoad = (tempDir++"lastArrays/"++PathName(outFolder).fileNameWithoutExtension++"_"++chanArray[0]++"_"++(startFrame-1)++".lastArray").postln;
-						lastArrayA = Object.readArchive(fileToLoad);
-					}{
-						lastArrayA = List.newClear(9);
-					}
-				}
 			};
 
 
@@ -383,9 +354,8 @@ TimeStretch {
 
 			Buffer.readChannel(server, inFile, 0, -1, [chanNum], {|buffer|
 				buffer.loadToFloatArray(action:{|floatArray|
-					temp = frameChunks.sum-floatArray.size;
-					floatArray = floatArray.addAll(FloatArray.fill(temp, {0}));
-					floatArray.size.postln;
+					temp = maxWindowSize-(floatArray.size%maxWindowSize);
+					floatArray = floatArray.addAll(FloatArray.fill(temp+maxWindowSize, {0}));
 					this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, fftType, binShift, filterOrder);
 				});
 			});
@@ -399,9 +369,8 @@ TimeStretch {
 					chanNum = chanArray[chanCount];
 					Buffer.readChannel(server, inFile, 0, -1, [chanCount], {|buffer|
 						buffer.loadToFloatArray(action:{|floatArray|
-							temp = frameChunks.sum-floatArray.size;
-							floatArray = floatArray.addAll(FloatArray.fill(temp, {0}));
-							floatArray.size.postln;
+							temp = maxWindowSize-(floatArray.size%maxWindowSize);
+							floatArray = floatArray.addAll(FloatArray.fill(temp+maxWindowSize, {0}));
 							this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, fftType, binShift, filterOrder);
 						});
 					});
