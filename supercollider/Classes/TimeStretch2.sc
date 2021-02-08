@@ -1,7 +1,7 @@
+//Copyright © 2021 Sam Pluta - sampluta.com
+//Released under GPLv3 License
+
 TimeStretch2 {
-	//by Sam Pluta - sampluta.com
-	// Based on the Alex Ness's NessStretch algorithm in Python
-	// thanks to Jean-Philippe Drecourt for his implementation of Paul Stretch, which was a huge influence on this code
 
 	*initClass {
 		StartUp.add {

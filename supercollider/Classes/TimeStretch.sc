@@ -1,3 +1,6 @@
+//Copyright © 2021 Sam Pluta - sampluta.com
+//Released under GPLv3 License
+
 NessWindow {
 	*ar { |trig, rVal=0.25, widthSamples=8192|
 		var fs = (1-(Slew.ar(
@@ -71,6 +74,25 @@ TimeStretch {
 		};
 		^Polar(mags2, phases2.asArray);
 	}
+
+/*	*phaseRandoFFT{|arrayA, lowBin, highBin, linkwitzRileyWindow, filterOrder|
+		var real1, real2, imag, fftSize, cosTable, hann, polar1, polar2, complex, complex2, ifft;
+
+		fftSize = arrayA.size;
+		cosTable = Signal.fftCosTable(fftSize);
+		hann = hannWindows[fftSize.asSymbol];
+
+		real1 = arrayA.as(Signal)*hann;
+		imag = Signal.newClear(fftSize);
+		complex = fft(real1, imag, cosTable);
+
+		polar1 = this.getPolar(complex, lowBin, highBin, linkwitzRileyWindow, filterOrder);
+		complex2 = polar1.asComplex;
+
+		ifft = ifft(complex2.real.as(Signal), complex2.imag.as(Signal), cosTable);
+
+		^[ifft.real.postln]
+	}*/
 
 	*phaseRandoDualRFFT{|arrayA, arrayB, lowBin, highBin, linkwitzRileyWindow, filterOrder|
 		var real1, real2, imag, rfftSize, cosTable, hann, polar1, polar2, complexDict, irfftDict;
@@ -164,7 +186,7 @@ TimeStretch {
 		}
 	}
 
-	*processChunk {|server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=1, binShift = 0, filterOrder=129|
+	*processChunk {|server, sfFinal, floatArray, chanNum, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=1, binShift = 0, filterOrder=129|
 		var frameChunk = frameChunks[fCNum];
 		var writeFile;
 		var bigList = List.fill(chunkSize, {0});
@@ -182,7 +204,8 @@ TimeStretch {
 
 
 			windowSize = windowSizes[num];
-			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);/*.addAll(Signal.fill(windowSize/2, {0}));*/
+			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);
+			//linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0}));
 			"num ".post;
 			num.postln;
 			"winSize ".post;
@@ -219,11 +242,12 @@ TimeStretch {
 			frames = frames.collect{|frame| this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder)}.flatten;
 
 			frames.do{|arrayB, frameNum|
-
 				smallArrays = [arrayA.copyRange((windowSize/2).asInteger, windowSize-1), arrayB.copyRange(0, (windowSize/2).asInteger-1)];
 
 				if(smallArrays[0].sum!=0){
 					correlation = (((smallArrays[0]*smallArrays[1]).sum)/((smallArrays[0]*smallArrays[0]).sum))}{correlation = 0};
+
+				if(correlation.isNaN){correlation = 0};
 
 				if(correlation<0){arrayB = arrayB.neg};
 
@@ -238,31 +262,15 @@ TimeStretch {
 			lastArrayA.put(num, arrayA);
 		};
 
-		writeFile = tempDir++PathName(outFolder).folderName++"_"++chanNum++"_"++fCNum++".wav";
-		writeFile.postln;
+		"writeChunk".postln;
+		sfFinal.writeData(bigList.as(FloatArray));
 
-		Buffer.loadCollection(server, bigList, 1, {|finalBuf0|
-			"time: ".post;
-			(Main.elapsedTime-startTime).postln;
-			finalBuf0.write(writeFile);
-
-			lastArrayA.writeArchive(tempDir++"lastArrays/"++PathName(outFolder).folderName++"_"++chanNum++"_"++fCNum++".lastArray");
-			fCNum = fCNum+1;
-			if(fCNum<frameChunks.size){
-				"next Chunk".postln;
-
-				this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType, binShift, filterOrder);
-			}{
-				"doneWChannel".postln;
-				NetAddr("127.0.0.1", NetAddr.langPort).sendMsg(("/"++serverNum).asSymbol, "process next chan");
-			}
-		});
-
+		^lastArrayA
 	}
 
 	*getServer{
 		if(server==nil){
-			serverNum = 57110+NRT_Server_Inc.next;
+			serverNum = 57100+NRT_Server_Inc.next;
 			while(
 				{("lsof -i:"++serverNum++" ").unixCmdGetStdOut.size > 0},
 				{serverNum = 57100+NRT_Server_Inc.next; serverNum.postln}
@@ -275,28 +283,32 @@ TimeStretch {
 		};
 	}
 
-	*mkStretchTemp{|path, inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, filterOrder=129|
+	*mkStretchTemp{|path, inFile, durMult=100, chanNum, splits = 9, filterOrder=129|
 		var file = File(path, "w");
 
-		file.write("TimeStretch.stretch("++inFile.quote++", "++outFolder.quote++", "++durMult++", "++chanArray++", 0, "++splits++", "++filterOrder++");");
+		file.write("TimeStretch.stretchChan("++inFile.quote++", "++durMult++", "++chanNum++","++splits++", "++filterOrder++");");
 		file.close;
 	}
 
-	*stretch2PlusChannels {|inFile, durMult=100, chanArray, startFrame=0, splits = 9, filterOrder=129|
+	*stretch2PlusChannels {|inFile, durMult=100, chanArray=nil, splits = 9, filterOrder=129|
 		var fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
 
 		if(chanArray==nil){chanArray = Array.fill(SoundFile.openRead(inFile).numChannels, {|i| i})};
 
-		chanArray.do{|chan, i2|
-			TimeStretch.mkStretchTemp(fileName++"_"++chan++".scd", inFile, fileName++"_"++durMult++"/", durMult, [chan], startFrame, splits, filterOrder);
-			AppClock.sched((10*i2), {("sclang "++fileName++"_"++chan++".scd").postln.runInTerminal});
+		chanArray.do{|chanNum, i2|
+			TimeStretch.mkStretchTemp(fileName++"_"++chanNum++".scd", inFile, durMult, chanNum, splits, filterOrder);
+			AppClock.sched((10*i2), {("sclang "++fileName++"_"++chanNum++".scd").postln.runInTerminal});
 		}
 	}
 
-	*stretch {|inFile, outFolder, durMult=100, chanArray, startFrame=0, splits = 9, filterOrder=129|
-		var fftType=1, winType=0, binShift=0, merge=0, maxWindowSize = 65536, windowSizes;
-		var chunkSize = 6553600, temp;
-		this.getServer;
+	*stretchChan {|inFile, durMult=100, chanNum=0, splits = 9, filterOrder=129|
+		var fftType=1, winType=0, binShift=0, maxWindowSize = 65536, windowSizes;
+		var chunkSize = 6553600, temp, sfFinal, floatArray;
+
+		var numSamplesToProcess, sf;
+		var totalFrames, totalChunks, frameChunks, tempDir;
+		var lastArrayA;
+		var extension;
 
 		if(splits.size==0){
 			windowSizes = (maxWindowSize/(2**(0..8))).asInteger.copyRange(9-splits, 8).postln;
@@ -304,89 +316,123 @@ TimeStretch {
 			windowSizes = splits.postln;
 		};
 
-		server.waitForBoot{
-			var numSamplesToProcess, sf;
-			var totalFrames, totalChunks, frameChunks, tempDir;
-			var lastArrayA, chanNum, chanCount;
+		this.makeWindows(winType);
+		this.makeFftCosTables;
 
-			this.makeWindows(winType);
-			this.makeFftCosTables;
+		startTime = Main.elapsedTime;
 
-			startTime = Main.elapsedTime;
+		sf = SoundFile.openRead(inFile);
 
-			if(outFolder.last.asString!="/"){outFolder=outFolder++"/"};
+		numSamplesToProcess=sf.sampleRate*sf.duration;
+		numSamplesToProcess.postln;
 
-			tempDir = (PathName(outFolder).pathOnly).standardizePath;
+		totalFrames = numSamplesToProcess*durMult;
 
+		totalChunks = (totalFrames/(chunkSize)).ceil;
+		frameChunks = Array.fill(totalChunks, {chunkSize});
 
-			if(PathName(tempDir).isFolder.not){("mkdir "++tempDir.escapeChar($ )).systemCmd};
-			if(PathName(tempDir++"lastArrays/").isFolder.not){("mkdir "++(tempDir++"lastArrays/").escapeChar($ )).postln.systemCmd};
+		"Processing Chunks: ".post; totalChunks.postln;
+		"Frame Chunks: ".post; frameChunks.postln;
 
-			sf = SoundFile.openRead(inFile);
+		floatArray = FloatArray.newClear(sf.numFrames*sf.numChannels);
 
-			numSamplesToProcess=sf.sampleRate*sf.duration;
-			numSamplesToProcess.postln;
+		sf.readData(floatArray);
 
-			chanArray = chanArray ?? Array.fill(sf.numChannels, {|i| i});
+		temp = maxWindowSize-(sf.numFrames%maxWindowSize);
 
-			totalFrames = numSamplesToProcess*durMult;
+		floatArray = floatArray.clump(sf.numChannels).flop[chanNum].addAll(FloatArray.fill(temp+maxWindowSize, {0}));
+		"FloatArray Size: ".post; floatArray.size.postln;
 
+		if(sf.duration*durMult>(2**31)){extension="w64"}{extension="wav"};
+		sfFinal = SoundFile.openWrite(PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension++"_long"++durMult++"_"++chanNum++"."++extension, extension, "float", 1);
 
-			totalChunks = (totalFrames/(chunkSize)).ceil;
-			frameChunks = Array.fill(totalChunks, {chunkSize});
-
-			"Processing Chunks: ".post; totalChunks.postln;
-			"Frame Chunks: ".post; frameChunks.postln;
-
-			chanCount = 0;
-			if(startFrame==0){
-				lastArrayA = List.newClear(9);
-			}{
-					var file;
-					("loading last array from frame"++startFrame).post;
-					file = (tempDir++"lastArrays/"++PathName(outFolder).folderName++"_"++chanArray[0]++"_"++(startFrame-1)++".lastArray").postln;
-					file.postln;
-					lastArrayA = Object.readArchive(file);
-			};
-
-
-			chanNum = chanArray[0];
-
-			Buffer.readChannel(server, inFile, 0, -1, [chanNum], {|buffer|
-				buffer.loadToFloatArray(action:{|floatArray|
-					temp = maxWindowSize-(floatArray.size%maxWindowSize);
-					floatArray = floatArray.addAll(FloatArray.fill(temp+maxWindowSize, {0}));
-					this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, startFrame, lastArrayA, serverNum, fftType, binShift, filterOrder);
-				});
-			});
-
-			OSCFunc({|msg, time, addr, recvPort|
-				msg.postln;
-				"nextChan".postln;
-				chanCount = chanCount+1;
-				chanCount.postln;
-				if(chanArray[chanCount]!=nil){
-					chanNum = chanArray[chanCount];
-					Buffer.readChannel(server, inFile, 0, -1, [chanCount], {|buffer|
-						buffer.loadToFloatArray(action:{|floatArray|
-							temp = maxWindowSize-(floatArray.size%maxWindowSize);
-							floatArray = floatArray.addAll(FloatArray.fill(temp+maxWindowSize, {0}));
-							this.processChunk(server, tempDir, floatArray, chanNum, outFolder, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, 0, lastArrayA, serverNum, fftType, binShift, filterOrder);
-						});
-					});
-				}{
-					"we're done".postln;
-					if(merge==1){
-						this.mergeFiles(outFolder, sf.numChannels);
-					}{
-						server.quit;
-						server = nil;
-					}
-				}
-			}, ("/"++serverNum).asSymbol);
-		}
+		lastArrayA = List.newClear(9);
+		frameChunks.size.do{|fCNum|
+			lastArrayA = this.processChunk(server, sfFinal, floatArray, chanNum, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType, binShift, filterOrder);
+		};
+		sfFinal.close;
+		"all stretched! closing file.".postln;
 	}
 
+
+	*merge {|inFilesArray, outPath, numChans=2, transientMix=1|
+
+		var files, channels, chunkSize = 6553600;
+		var buffers, counter, doit, soundFiles, finalFile, extension;
+		var temp, temp5;
+
+
+		soundFiles = inFilesArray.collect{|file| SoundFile.openRead(file)};
+
+		if(soundFiles[0].duration>(2**30)){extension="w64"}{extension="wav"};
+		outPath = PathName(outPath).pathOnly++PathName(outPath).fileNameWithoutExtension++"."++extension;
+		finalFile = SoundFile.openWrite(outPath, extension, "float", numChans, soundFiles[0].sampleRate);
+		"expecting 2 or 4 files...full stretch or resonant files should be the first two files...transient files should be the second two".postln;"".postln;
+		"for longer stretches, you may just want to use a DAW".postln;"".postln;
+		"merge files!".postln;"".postln;
+		"you will be done in ".post;(soundFiles[0].duration*soundFiles[0].sampleRate/chunkSize).post;" ticks".postln; "".postln;
+		(soundFiles[0].duration*soundFiles[0].sampleRate/chunkSize).do{|i|
+			".".post;
+			temp = List.fill(soundFiles.size, {FloatArray.newClear(chunkSize)});
+
+			numChans.do{|i2|
+				soundFiles[i2].readData(temp[i2]);
+				if(soundFiles.size>2){
+					soundFiles[i2+2].readData(temp[i2+2]);
+					temp.put(i2, temp[i2]+(temp[i2+2]*transientMix));
+				};
+			};
+
+			temp5 = temp.copyRange(0,1).flop.flat.as(FloatArray);
+			finalFile.writeData(temp5);
+		};
+		"".postln;
+		"done - closing file".postln;
+		finalFile.close;
+	}
+
+
+	// *transientSeparation {|inFile|
+	// 	var t1, t2, r1, r2, buf;
+	// 	var fileName;
+	// 	var resFileOut, transFileOut, tempDir;
+	//
+	// 	this.getServer;
+	//
+	// 	fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
+	//
+	// 	resFileOut = fileName++"_resonance.wav";
+	// 	if(transFileOut==nil){transFileOut = fileName++"_transients.wav"};
+	//
+	// 	server.waitForBoot{
+	//
+	// 		buf = Buffer.read(server, inFile, action:{|buffy|
+	//
+	// 			t1 = Buffer.new(server);
+	// 			r1 = Buffer.new(server);
+	// 			t2 = Buffer.new(server);
+	// 			r2 = Buffer.new(server);
+	// 			"separating".postln;
+	// 			FluidBufTransients.process(server, buffy, 0, -1, 0, -1, t1, r1, 40, 1024, 256, 10, 2, 1.1, 14, 25,
+	// 				action:{|trans, res|
+	// 					"separating again".postln;
+	// 					FluidBufTransients.process(server, res, 0, -1, 0, -1, t2, r2, 40, 512, 256, 10, 2, 1.1, 14, 25,
+	// 						action:{|trans2, res2|
+	// 							res2.write(resFileOut);
+	// 							FluidBufCompose.process(server, trans, destination:trans2, destGain:1, action:{|finTrans|
+	// 								{
+	// 									"putting back together".postln;
+	// 									finTrans.write(transFileOut);
+	// 									server.sync;
+	// 									server.quit;
+	// 									server = nil;
+	// 								}.fork;
+	// 							})
+	// 					})
+	// 			});
+	// 		});
+	// 	}
+	// }
 
 
 }
