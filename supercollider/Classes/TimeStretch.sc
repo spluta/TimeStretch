@@ -75,7 +75,7 @@ TimeStretch {
 		^Polar(mags2, phases2.asArray);
 	}
 
-/*	*phaseRandoFFT{|arrayA, lowBin, highBin, linkwitzRileyWindow, filterOrder|
+	*phaseRandoFFT{|arrayA, lowBin, highBin, linkwitzRileyWindow, filterOrder|
 		var real1, real2, imag, fftSize, cosTable, hann, polar1, polar2, complex, complex2, ifft;
 
 		fftSize = arrayA.size;
@@ -91,10 +91,10 @@ TimeStretch {
 
 		ifft = ifft(complex2.real.as(Signal), complex2.imag.as(Signal), cosTable);
 
-		^[ifft.real.postln]
-	}*/
+		^ifft.real
+	}
 
-	*phaseRandoDualRFFT{|arrayA, arrayB, lowBin, highBin, linkwitzRileyWindow, filterOrder|
+/*	*phaseRandoDualRFFT{|arrayA, arrayB, lowBin, highBin, linkwitzRileyWindow, filterOrder|
 		var real1, real2, imag, rfftSize, cosTable, hann, polar1, polar2, complexDict, irfftDict;
 
 		rfftSize = arrayA.size/2+1;
@@ -112,7 +112,7 @@ TimeStretch {
 		irfftDict = polar1.real.as(Signal).irfftTwo(polar1.imag.as(Signal), polar2.real.as(Signal), polar2.imag.as(Signal), cosTable);
 
 		^[irfftDict[\irfft1], irfftDict[\irfft2]]
-	}
+	}*/
 
 	*makeWindows {|winType=0|
 		var temp, windowSizeList, window;
@@ -204,8 +204,8 @@ TimeStretch {
 
 
 			windowSize = windowSizes[num];
-			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);
-			//linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0}));
+			//linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);
+			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0}));
 			"num ".post;
 			num.postln;
 			"winSize ".post;
@@ -238,8 +238,9 @@ TimeStretch {
 				tempArray
 			};
 
-			frames = frames.clump(2);
-			frames = frames.collect{|frame| this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder)}.flatten;
+			//frames = frames.clump(2);
+			//frames = frames.collect{|frame| this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder)}.flatten;
+			frames = frames.collect{|frame| this.phaseRandoFFT(frame, lowBin, highBin, linkwitzRileyWindow, filterOrder)};
 
 			frames.do{|arrayB, frameNum|
 				smallArrays = [arrayA.copyRange((windowSize/2).asInteger, windowSize-1), arrayB.copyRange(0, (windowSize/2).asInteger-1)];
