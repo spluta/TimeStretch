@@ -1,5 +1,5 @@
 //Copyright © 2021 Sam Pluta - sampluta.com
-//Released under GPLv3 License
+//Free Software! - Released under GPLv3 License
 
 NessWindow {
 	*ar { |trig, rVal=0.25, widthSamples=8192|
@@ -91,10 +91,10 @@ TimeStretch {
 
 		ifft = ifft(complex2.real.as(Signal), complex2.imag.as(Signal), cosTable);
 
-		^ifft.real
+		^ifft.real*2
 	}
 
-/*	*phaseRandoDualRFFT{|arrayA, arrayB, lowBin, highBin, linkwitzRileyWindow, filterOrder|
+	*phaseRandoDualRFFT{|arrayA, arrayB, lowBin, highBin, linkwitzRileyWindow, filterOrder|
 		var real1, real2, imag, rfftSize, cosTable, hann, polar1, polar2, complexDict, irfftDict;
 
 		rfftSize = arrayA.size/2+1;
@@ -108,11 +108,10 @@ TimeStretch {
 		polar1 = this.getPolar(complexDict[\rfft1], lowBin, highBin, linkwitzRileyWindow, filterOrder);
 		polar2 = this.getPolar(complexDict[\rfft2], lowBin, highBin, linkwitzRileyWindow, filterOrder);
 
-
 		irfftDict = polar1.real.as(Signal).irfftTwo(polar1.imag.as(Signal), polar2.real.as(Signal), polar2.imag.as(Signal), cosTable);
 
 		^[irfftDict[\irfft1], irfftDict[\irfft2]]
-	}*/
+	}
 
 	*makeWindows {|winType=0|
 		var temp, windowSizeList, window;
@@ -186,7 +185,7 @@ TimeStretch {
 		}
 	}
 
-	*processChunk {|server, sfFinal, floatArray, chanNum, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=1, binShift = 0, filterOrder=129|
+	*processChunk {|server, sfFinal, floatArray, chanNum, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType=0, binShift = 0, filterOrder=129|
 		var frameChunk = frameChunks[fCNum];
 		var writeFile;
 		var bigList = List.fill(chunkSize, {0});
@@ -204,8 +203,11 @@ TimeStretch {
 
 
 			windowSize = windowSizes[num];
-			//linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);
-			linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0}));
+			if(fftType == 0){
+				linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0}));
+			}{
+				linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);
+			};
 			"num ".post;
 			num.postln;
 			"winSize ".post;
@@ -238,9 +240,12 @@ TimeStretch {
 				tempArray
 			};
 
-			//frames = frames.clump(2);
-			//frames = frames.collect{|frame| this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder)}.flatten;
-			frames = frames.collect{|frame| this.phaseRandoFFT(frame, lowBin, highBin, linkwitzRileyWindow, filterOrder)};
+			if(fftType==0){
+				frames = frames.collect{|frame| this.phaseRandoFFT(frame, lowBin, highBin, linkwitzRileyWindow, filterOrder)};
+			}{
+				frames = frames.clump(2);
+				frames = frames.collect{|frame| this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder)}.flatten;
+			};
 
 			frames.do{|arrayB, frameNum|
 				smallArrays = [arrayA.copyRange((windowSize/2).asInteger, windowSize-1), arrayB.copyRange(0, (windowSize/2).asInteger-1)];
@@ -284,32 +289,32 @@ TimeStretch {
 		};
 	}
 
-	*mkStretchTemp{|path, inFile, durMult=100, chanNum, splits = 9, filterOrder=129|
+	*mkStretchTemp{|path, inFile, durMult=100, chanNum, splits = 9, filterOrder=129, fftType=0|
 		var file = File(path, "w");
 
-		file.write("TimeStretch.stretchChan("++inFile.quote++", "++durMult++", "++chanNum++","++splits++", "++filterOrder++");");
+		file.write("TimeStretch.stretchChan("++inFile.quote++", "++durMult++", "++chanNum++","++splits++", "++filterOrder++","++fftType++");");
 		file.close;
 	}
 
-	*stretch2PlusChannels {|inFile, durMult=100, chanArray=nil, splits = 9, filterOrder=129|
+	*stretch2PlusChannels {|inFile, durMult=100, chanArray=nil, splits = 9, filterOrder=129, fftType=0|
 		var fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
 
 		if(chanArray==nil){chanArray = Array.fill(SoundFile.openRead(inFile).numChannels, {|i| i})};
 
 		chanArray.do{|chanNum, i2|
-			TimeStretch.mkStretchTemp(fileName++"_"++chanNum++".scd", inFile, durMult, chanNum, splits, filterOrder);
-			AppClock.sched((10*i2), {("sclang "++fileName++"_"++chanNum++".scd").postln.runInTerminal});
+			TimeStretch.mkStretchTemp(fileName++"_"++chanNum++".scd", inFile, durMult, chanNum, splits, filterOrder, fftType);
+			AppClock.sched((1), {("sclang "++fileName++"_"++chanNum++".scd").postln.runInTerminal});
 		}
 	}
 
-	*stretchChan {|inFile, durMult=100, chanNum=0, splits = 9, filterOrder=129|
-		var fftType=1, winType=0, binShift=0, maxWindowSize = 65536, windowSizes;
+	*stretchChan {|inFile, durMult=100, chanNum=0, splits = 9, filterOrder=129, fftType = 0|
+		var winType=0, binShift=0, maxWindowSize = 65536, windowSizes;
 		var chunkSize = 6553600, temp, sfFinal, floatArray;
 
 		var numSamplesToProcess, sf;
 		var totalFrames, totalChunks, frameChunks, tempDir;
 		var lastArrayA;
-		var extension;
+		var extension, time = Main.elapsedTime;
 
 		if(splits.size==0){
 			windowSizes = (maxWindowSize/(2**(0..8))).asInteger.copyRange(9-splits, 8).postln;
@@ -353,6 +358,7 @@ TimeStretch {
 		};
 		sfFinal.close;
 		"all stretched! closing file.".postln;
+		("Time to Stretch: "++(Main.elapsedTime-time)).postln;
 	}
 
 

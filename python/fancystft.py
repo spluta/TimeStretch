@@ -5,7 +5,7 @@
 # by Alex Ness (asness@gmail.com)
 # and Jem Altieri (jem@jem.space)
 #
-# Licence: CC BY-SA 3.0 US
+# Licence: GPLv3
 
 from os.path import join
 import logging as log

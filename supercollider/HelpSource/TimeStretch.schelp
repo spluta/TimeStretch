@@ -58,6 +58,10 @@ argument:: filterOrder
 
 By default (value = 129) the filter will be a brickwall fft bandpass filter separating frequency bands. However, by giving filterOrder a number 128 and below, the program switches to a Linkwitz-Riley filter with the order number provided.
 
+argument:: fftType
+
+By default (fftType=0) this will use a standard fft. However, if set to fftType=1, it will use the rfftTwo from the SignalBox Quark (which needs to be installed). This is about 50% faster.
+
 method::stretch2PlusChannels
 
 Stretches a stereo+ audio file into single channel audio files in the same folder as the source file. Will open two instances of sclang in the terminal to stretch these independently. Only works on MacOS.
@@ -79,6 +83,10 @@ argument:: splits
 See above.
 
 argument:: filterOrder
+
+See above.
+
+argument:: fftType
 
 See above.
 
