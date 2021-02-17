@@ -1,9 +1,9 @@
 (
   name: "TimeStretch",
   summary: "An extreme time stretch plugin, based on the Ness Stretch layered STFT algorithm.",
-  version: "1.0.0",
+  version: "1.5.0",
   schelp: "TimeStretch",
-  license: "GPL",
+  license: "GPLv3",
 	dependencies: ["SignalBox", "Flucoma Fluid Decomposition Library (optional)"],
-  copyright: "Sam Pluta and Alex Ness, 2020"
+  copyright: "Sam Pluta and Alex Ness, 2021"
 )

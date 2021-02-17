@@ -62,12 +62,11 @@ TimeStretch {
 	*getPolar {|complex, lowBin, highBin, linkwitzRileyWindow, filterOrder|
 		var mags, mags2, phases2;
 
-		mags = complex.magnitude.deepCopy.asList;
-
 		if(filterOrder<129){
-			mags2 = mags*linkwitzRileyWindow;
+			mags2 = complex.magnitude*linkwitzRileyWindow;
 			phases2 = complex.phase.collect{|phase, i| if(mags2[i]>0){pi.rand}{phase}};
 		}{
+			mags = complex.magnitude.asList;
 			mags2 = Array.fill(mags.size, {0});
 			phases2 = complex.phase.deepCopy.asList;
 			(lowBin..highBin).do{|i| mags2.put(i, mags[i]); phases2.put(i, pi.rand)};
@@ -349,8 +348,8 @@ TimeStretch {
 		floatArray = floatArray.clump(sf.numChannels).flop[chanNum].addAll(FloatArray.fill(temp+maxWindowSize, {0}));
 		"FloatArray Size: ".post; floatArray.size.postln;
 
-		if(sf.duration*durMult>(2**31)){extension="w64"}{extension="wav"};
-		sfFinal = SoundFile.openWrite(PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension++"_long"++durMult++"_"++chanNum++"."++extension, extension, "float", 1);
+		if(sf.numFrames*durMult>(2**30)){extension="w64"}{extension="wav"};
+		sfFinal = SoundFile.openWrite(PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension++"_long"++durMult++"_"++chanNum++"."++extension, extension, "float", 1, sf.sampleRate);
 
 		lastArrayA = List.newClear(9);
 		frameChunks.size.do{|fCNum|
@@ -371,7 +370,7 @@ TimeStretch {
 
 		soundFiles = inFilesArray.collect{|file| SoundFile.openRead(file)};
 
-		if(soundFiles[0].duration>(2**30)){extension="w64"}{extension="wav"};
+		if(soundFiles[0].numFrames>(2**29)){extension="w64"}{extension="wav"};
 		outPath = PathName(outPath).pathOnly++PathName(outPath).fileNameWithoutExtension++"."++extension;
 		finalFile = SoundFile.openWrite(outPath, extension, "float", numChans, soundFiles[0].sampleRate);
 		"expecting 2 or 4 files...full stretch or resonant files should be the first two files...transient files should be the second two".postln;"".postln;
