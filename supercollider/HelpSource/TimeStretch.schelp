@@ -64,7 +64,7 @@ By default (fftType=0) this will use a standard fft. However, if set to fftType=
 
 method::stretch2PlusChannels
 
-Stretches a stereo+ audio file into single channel audio files in the same folder as the source file. Will open two instances of sclang in the terminal to stretch these independently. Only works on MacOS.
+Stretches a stereo+ audio file into single channel audio files in the same folder as the source file. Will open two instances of sclang in the terminal to stretch these independently. Only works on MacOS. The folder that contains sclang has to be in your PATH for this to work.
 
 argument::inFile
 
