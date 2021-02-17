@@ -128,7 +128,7 @@ code::
 
 //it is best to put a sound file you want to stretch in its own folder
 
-//for mac users stretch stretch2PlusChannels is best
+//for mac users stretch2PlusChannels is best - each channel will be processed in its own instance of sclang in the terminal
 
 TimeStretch.stretch2PlusChannels("Bieber", 100, [0,1], 9);
 
@@ -146,10 +146,11 @@ TimeStretch.merge(["Bieber_long_0", "Bieber_long_1"], "BieberStereo.wav", 2, 1);
 //Needs the FluCoMa Transient Separation algorithm FluidBufTransients
 TimeStretch.transientSeparation("/Volumes/T2/USmileTransientsExcerpt/u-smile_excerpt.wav");
 
-TimeStretch.stretch2PlusChannels("Bieber_resonance", 100, [0,1], 9);
-TimeStretch.stretch2PlusChannels("Bieber_transients", 100, [0,1], 4); //notice the 4 layer version for transients
+TimeStretch.stretch2PlusChannels("Bieber_resonance", 100, [0,1], 9, 64, 1); //uses a Linkwitz-Riley filter instead of a brickwall and the faster rfftTwo from the SignalBox Quark
+TimeStretch.stretch2PlusChannels("Bieber_transients", 100, [0,1], 4, 64, 1); //notice the 4 layer version for transients
 
 //merge the resonance and transients files into a single mixed stereo file
+//honestly, you probably should use a DAW
 TimeStretch.merge(["Bieber_resonance_long_0", "Bieber_resonance_long_1", "Bieber_transients_long_0", "Bieber_transients_long_1"], "BieberAllOfThem.wav", 2, 1);
 
 ::
