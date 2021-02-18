@@ -215,7 +215,7 @@ TimeStretch {
 			step = (windowSize/2)/durMult;
 			"step: ".post; step.postln;
 
-			numFrames = frameChunk/step/durMult;
+			numFrames = (frameChunk/step/durMult).asInteger;
 			"numFrames: ".post; numFrames.postln;
 
 			if(fCNum==0){
@@ -231,7 +231,7 @@ TimeStretch {
 			frames = (0..(numFrames-1)).collect{|frameNum|
 				var tempArray;
 				pointer = (fCNum*(chunkSize/durMult))+(frameNum*step)-(windowSize/2+binShiftSamples);
-				//pointer.postln;
+				//frameNum.post; " ".post; pointer.postln;
 				if(pointer<0){
 					tempArray = floatArray.copyRange(0, (pointer.floor+windowSize).asInteger);
 					tempArray = FloatArray.fill(windowSize-tempArray.size, {0}).addAll(tempArray);
@@ -245,7 +245,15 @@ TimeStretch {
 				frames = frames.collect{|frame| this.phaseRandoFFT(frame, lowBin, highBin, linkwitzRileyWindow, filterOrder)};
 			}{
 				frames = frames.clump(2);
-				frames = frames.collect{|frame| this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder)}.flatten;
+				frames = frames.collect{|frame|
+					if(frame.size==2){
+						this.phaseRandoDualRFFT(frame[0], frame[1], lowBin, highBin, linkwitzRileyWindow, filterOrder);
+					}{
+						//only if the numFrames is odd
+						//"odd man out".postln;
+						[this.phaseRandoDualRFFT(frame[0], frame[0], lowBin, highBin, linkwitzRileyWindow, filterOrder)[0]]
+					}
+				}.flatten
 			};
 
 			frames.do{|arrayB, frameNum|
@@ -342,9 +350,12 @@ TimeStretch {
 
 		chunkSize = maxWindowSize*durMult;
 
+		while({chunkSize>6553600}, {chunkSize=(chunkSize/2).asInteger});
+
 		totalChunks = (totalFrames/(chunkSize)).ceil;
 		frameChunks = Array.fill(totalChunks, {chunkSize});
 
+		"durMult: ".post; durMult.postln;
 		"Processing Chunks: ".post; totalChunks.postln;
 		"Frame Chunks: ".post; frameChunks.postln;
 
