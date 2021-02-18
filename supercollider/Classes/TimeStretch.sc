@@ -349,10 +349,9 @@ TimeStretch {
 
 		totalFrames = numSamplesToProcess*durMult;
 
-/*		chunkMul = durMult;
-		while({chunkMul%2==0}, {chunkMul=(chunkMul/2).asInteger});
-		if(chunkMul%2==1){chunkMul = chunkMul*2};*/
-		chunkSize = maxWindowSize*durMult;
+		chunkMul = durMult;
+		while({chunkMul%2==0}, {chunkMul=(chunkMul/2)});
+		chunkSize = (maxWindowSize*chunkMul).asInteger;
 
 		totalChunks = (totalFrames/(chunkSize)).ceil;
 		frameChunks = Array.fill(totalChunks, {chunkSize});
