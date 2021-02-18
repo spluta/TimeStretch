@@ -236,6 +236,7 @@ TimeStretch {
 					tempArray = floatArray.copyRange(0, (pointer.floor+windowSize).asInteger);
 					tempArray = FloatArray.fill(windowSize-tempArray.size, {0}).addAll(tempArray);
 				}{
+					pointer = pointer.floor;
 					tempArray = floatArray.copyRange((pointer).asInteger, (pointer+windowSize-1).asInteger);
 				};
 				tempArray
@@ -251,7 +252,7 @@ TimeStretch {
 					}{
 						//only if the numFrames is odd
 						//"odd man out".postln;
-						[this.phaseRandoDualRFFT(frame[0], frame[0], lowBin, highBin, linkwitzRileyWindow, filterOrder)[0]]
+						[this.phaseRandoFFT(frame[0], lowBin, highBin, Signal.linkwitzRileyBP(windowSize/2, lowBin-1, highBin, filterOrder).addAll(Signal.fill(windowSize/2, {0})), filterOrder)]
 					}
 				}.flatten
 			};
@@ -318,7 +319,7 @@ TimeStretch {
 
 	*stretchChan {|inFile, durMult=100, chanNum=0, splits = 9, filterOrder=129, fftType = 0|
 		var winType=0, binShift=0, maxWindowSize = 65536, windowSizes;
-		var chunkSize, temp, sfFinal, floatArray;
+		var chunkSize, chunkMul, temp, sfFinal, floatArray;
 
 		var numSamplesToProcess, sf;
 		var totalFrames, totalChunks, frameChunks, tempDir;
@@ -348,9 +349,10 @@ TimeStretch {
 
 		totalFrames = numSamplesToProcess*durMult;
 
+/*		chunkMul = durMult;
+		while({chunkMul%2==0}, {chunkMul=(chunkMul/2).asInteger});
+		if(chunkMul%2==1){chunkMul = chunkMul*2};*/
 		chunkSize = maxWindowSize*durMult;
-
-		while({chunkSize>6553600}, {chunkSize=(chunkSize/2).asInteger});
 
 		totalChunks = (totalFrames/(chunkSize)).ceil;
 		frameChunks = Array.fill(totalChunks, {chunkSize});

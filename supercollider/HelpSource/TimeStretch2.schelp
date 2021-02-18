@@ -85,10 +85,10 @@ Will start an NRT server, load the file, and execute the time stretch. Each inst
 code::
 
 //The new sound file will go into the default recordings directory in SC
-TimeStretch.stretch("Bieber", nil, 100);  //try it with Biebs
+TimeStretch2.stretch("Bieber", nil, 100);  //try it with Biebs
 
 //The new sound file will go into the default recordings directory in SC
-TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 100);
+TimeStretch2.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 100);
 
 //If the above throws an error, you may need to increase the default Server memory allocation when using multiple FFT layers. If so, run the following before running the above line of code
 Server.local.options.memSize = 16384;
@@ -99,7 +99,7 @@ I think the best results come from [2,2,2,2,2,2,2,4,4] with a default sine envel
 
 code::
 
-TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, [2,2,2,2,2,2,2,4,4]);
+TimeStretch2.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, [2,2,2,2,2,2,2,4,4]);
 
 ::
 
@@ -109,7 +109,7 @@ code::
 
 //will work with mono, stereo, or even N channel files
 
-TimeStretch.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10d.wav", 10, numSplits:4);
+TimeStretch2.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10d.wav", 10, numSplits:4);
 ::
 
 
