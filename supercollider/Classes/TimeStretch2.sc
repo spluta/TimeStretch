@@ -31,19 +31,10 @@ TimeStretch2 {
 				}).flatten;
 
 				//delay the signal so that all fftSizes line up (the will already be delayed by the fftSize
-				sig = DelayC.ar(sig, fftMax-fftSize+BlockSize.ir/SampleRate.ir, fftMax-fftSize+BlockSize.ir/SampleRate.ir);
-				/*
-				analSig = [sig[1],sig[3]];
-				sig = [sig[0], sig[2]];*/
+				sig = DelayC.ar(sig, (3*fftMax/2)-(3*fftSize/2)+BlockSize.ir/SampleRate.ir, fftMax-fftSize+BlockSize.ir/SampleRate.ir);
 
-				//offset the second channel of frames
-				//analSig[1] = DelayC.ar(analSig[1], trigPeriod/2, trigPeriod/2);
 				sig[1] = DelayC.ar(sig[1], trigPeriod/2, trigPeriod/2);
 
-				//calculate the average correlation over each
-				//correlation = ((sig[0]*sig[1])/((sig[0]*sig[0]).clip(0.001, 1))).clip(-1.0, 1.0);
-
-				//sum = RunningSum.ar((analSig[0]*analSig[1]), fftSize/2)/RunningSum.ar((analSig[0]*analSig[0]), fftSize/2);
 				sum = RunningSum.ar((sig[0]*sig[1]), fftSize/2)/RunningSum.ar((sig[0]*sig[0]), fftSize/2);
 
 				rVal = Latch.ar(sum, trig1+trig2).clip(-1,1);
@@ -63,9 +54,6 @@ TimeStretch2 {
 
 				window0 = NessWindow.ar(trig1, rVal.abs, fftSize)*rVal1;
 				window1 = NessWindow.ar(trig2, rVal.abs, fftSize)*rVal2;
-
-				//window0 = (SinOsc.ar(1/(2*trigPeriod))**((rVal.abs))).abs*rVal1;
-				//window1 = (SinOsc.ar(1/(2*trigPeriod), pi/2)**((rVal.abs))).abs*rVal2;
 
 				sig = DelayC.ar(sig, fftMax/SampleRate.ir, fftMax/SampleRate.ir);
 
@@ -88,8 +76,8 @@ TimeStretch2 {
 		}
 	}
 
-	*stretch { |inFile, outFile, durMult, fftMax = 65536, numSplits = 9, amp = 1, action|
-		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat;
+	*stretch { |inFile, durMult, numSplits = 9, amp = 1, action|
+		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat, outFile, fftMax = 65536;
 
 		action ?? {action = {"done stretchin!".postln}};
 
@@ -101,8 +89,6 @@ TimeStretch2 {
 			numChans = sf.numChannels;
 
 			if(outFile == nil){outFile = inFile.pathOnly++inFile.fileNameWithoutExtension++durMult++".wav"};
-
-			//Server.local.options.verbosity_(verbosity);
 
 			server = Server(("nrt"++NRT_Server_ID.next).asSymbol,
 				options: Server.local.options
@@ -119,10 +105,15 @@ TimeStretch2 {
 				filtVals = List.fill(8, {|i| 1/8**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
 			};
 
-			if((numSplits-1)<8){ filtVals = filtVals.copyRange(0, (numSplits-1))};
+			if((numSplits)<9){ filtVals = filtVals.copyRange(9-numSplits, 8)};
 			filtVals.put(filtVals.size-1, [filtVals[filtVals.size-1][0], 1]);
 
-			fftVals = List.fill(filtVals.size, {|i| fftMax/(2**i)});
+			filtVals[0].put(0, 0);
+
+			fftVals = List.fill(filtVals.size, {|i| fftMax/(2**(8-i))}).reverse;
+
+			filtVals.postln;
+			fftVals.postln;
 
 			buffer0 = Buffer.new(server, 0, 1);
 			buffer1 = Buffer.new(server, 0, 1);
@@ -134,11 +125,14 @@ TimeStretch2 {
 				nrtJam = this.addBundles(nrtJam, server, inFile, buffer1, 1, durMult, 1, amp, filtVals, fftVals, fftMax);
 			};
 
-			if((sf.duration*sf.numChannels*durMult)<(8*60*60)){headerFormat="wav"}{
-				headerFormat="caf";
-				outFile = PathName(outFile).pathOnly++PathName(outFile).fileNameWithoutExtension++".caf";
+			if((sf.duration*sf.numChannels*durMult)<(8*60*60)){
+				headerFormat="wav";
+				outFile = inFile.pathOnly++inFile.fileNameWithoutExtension++"_"++durMult++".wav";
+			}{
+				headerFormat="w64";
+				outFile = inFile.pathOnly++inFile.fileNameWithoutExtension++"_"++durMult++".w64";
 			};
-
+			outFile.postln;
 
 			nrtJam.recordNRT(
 				outputFilePath: outFile.standardizePath,
@@ -157,7 +151,6 @@ TimeStretch2 {
 
 		nrtJam.add([0.0, buffer.allocReadChannelMsg(inFile.fullPath, 0, -1, [chanNum])]);
 		filtVals.do{|fv, i|
-			//nrtJam.add([0.0, Synth.basicNew(("pb_monoStretch2_Overlap_"++fftVals[i].asInteger).asSymbol.postln, server).newMsg(args: [\out, outChan, \bufnum, buffer.bufnum, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0].postln, \lowPass, (fv[1]).postln, \amp, amp])])
 			nrtJam.add([0.0, Synth.basicNew((\pb_monoStretch2_Overlap2), server).newMsg(args: [\out, outChan, \bufnum, buffer.bufnum, fftSize:fftVals[i].postln, fftMax:fftMax, \stretch, durMult, \hiPass, fv[0].postln, \lowPass, (fv[1]).postln, \amp, amp])])
 		};
 		^nrtJam

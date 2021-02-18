@@ -198,8 +198,6 @@ TimeStretch {
 			var arrayA, arrayB;
 
 			if(num==0){lowBin=0; highBin = 127}{lowBin=64; highBin = 127};
-			lowBin.post;" ".post;highBin.postln;
-
 
 			windowSize = windowSizes[num];
 			if(fftType == 0){
@@ -207,16 +205,16 @@ TimeStretch {
 			}{
 				linkwitzRileyWindow = Signal.linkwitzRileyBP(windowSize/2+1, lowBin-1, highBin, filterOrder);
 			};
-			"num ".post;
+/*			"num ".post;
 			num.postln;
 			"winSize ".post;
-			windowSize.postln;
+			windowSize.postln;*/
 
 			step = (windowSize/2)/durMult;
-			"step: ".post; step.postln;
+			//"step: ".post; step.postln;
 
 			numFrames = (frameChunk/step/durMult).asInteger;
-			"numFrames: ".post; numFrames.postln;
+			//"numFrames: ".post; numFrames.postln;*/
 
 			if(fCNum==0){
 				arrayA = Array.fill(windowSize, {0});
@@ -326,10 +324,10 @@ TimeStretch {
 		var lastArrayA;
 		var extension, time = Main.elapsedTime;
 
-		if(durMult.isFloat){
+/*		if(durMult.isFloat){
 			durMult = durMult.asInteger;
 			"durMult must be an integer. Rounding to: ".post; durMult.postln;
-		};
+		};*/
 
 		if(splits.size==0){
 			windowSizes = (maxWindowSize/(2**(0..8))).asInteger.copyRange(9-splits, 8).postln;
@@ -349,9 +347,10 @@ TimeStretch {
 
 		totalFrames = numSamplesToProcess*durMult;
 
-		chunkMul = durMult;
+		/*chunkMul = durMult;
 		while({chunkMul%2==0}, {chunkMul=(chunkMul/2)});
-		chunkSize = (maxWindowSize*chunkMul).asInteger;
+		chunkSize = (maxWindowSize*chunkMul).asInteger;*/
+		chunkSize = 65536;
 
 		totalChunks = (totalFrames/(chunkSize)).ceil;
 		frameChunks = Array.fill(totalChunks, {chunkSize});

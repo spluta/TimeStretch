@@ -4,6 +4,9 @@ related:: Classes/FFT, Classes/IFFT, Classes/PV_Diffuser, Classes/PV_BrickWall
 categories::  UGens>FFT
 
 Description::
+
+Though much slower, TimeStretch is preferred, as it sounds much better. TimeStretch2 is still wonky. Use it at your own risk. TimeStretch also does not work on files with a sample rate other than 44100.
+
 Implements a phase randomized FFT time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
 0-86hz : 65536
@@ -34,39 +37,16 @@ argument::inFile
 
 Path to the input file to be stretch. Can be a mono or stereo file.
 
-argument::outFile
-
-Path to the destination output file. Will output a mono or stereo file corresponding to the input. Will output a WAV file up to 4gb and a CAF if larger.
+Will output a mono or stereo file corresponding to the input. Will output a WAV file up to 4gb and a w64 if larger.
 
 argument::durMult
 
 	How many times longer the outFile will be than the inFile. Goes waaaaay past 11 (try 100!).
 
-argument::fftMax
-
-The largest FFT buffer size, for the lowest frequency data.
-
-argument::overlaps
-
-The default is 2, but 4 is also an option.
-
-If given a 2, 4, all of the FFT bands will use the same overlap. However, if the user gives an array of values, like [2,2,2,2,2,2,2,4,4], each band will have its own overlap setting. This custom setting is quite nice, smoothing out the top end.
 
 argument::numSplits
 
-	By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below 22050, then subsequent octaves down from there, leaving everything below 86hz to the largest buffer. However, some material, like classical orchestral music, gets swimmy above a certain register (or the swimminess that is welcome in pop becomes unwelcome). Here you can set the split to 8 or lower. Setting the number to 7, for instance, leaves us with a top FFT dealing with the frequency range above 2756hz with a bin size of 1024 rather the audio range above 11025 with a bin size of 256, which is the default.
-
-	Simple answer: if it is swimmy, try a 8 or lower here. For string music, for instance, I found 4 to be best. A number above 9 will do nothing.
-
-argument::wintype
-
-For the envelope over the IFFT, choose between the default (0) sine wave to an exponential power provided by the winExp argument or (1) the classic paulstretch window.
-
-wintype for an overlap of 4 will always be a Sine window.
-
-argument::winExp
-
-An argument used in collaboration with wintype 0 only. This will warp the sine wave envelope over the IFFT window by a power of this value. Thus the window will be a sine^winExp instead of just a sine. Default is 1.25. It can also be an array. Array.series(9, 1.25, -0.01) is a recommended value.
+	By default, the algorithm will split audio data into 9 frequency "octaves", starting with the first octave below nyquist, then subsequent octaves down from there, leaving everything below the last split to the largest buffer. However, for files of transients, you may want to approach this differently. A number smaller than 9 will leave the top N octaves "normal", but will stop at the number provided. So, a 4 would have a max window size of 2048.
 
 argument::amp
 
@@ -82,34 +62,26 @@ Examples::
 
 Will start an NRT server, load the file, and execute the time stretch. Each instance of TimeStretch will run on its own server, so you can run as many simultaneously as your computer can handle.
 
+For best results
+
 code::
 
-//The new sound file will go into the default recordings directory in SC
-TimeStretch2.stretch("Bieber", nil, 100);  //try it with Biebs
+//Best practice is to place your audio file into its own folder
+//The new sound file will go into the same folder as your
+TimeStretch2.stretch("Bieber", 100);  //try it with Biebs
 
-//The new sound file will go into the default recordings directory in SC
-TimeStretch2.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10.wav", 100);
 
 //If the above throws an error, you may need to increase the default Server memory allocation when using multiple FFT layers. If so, run the following before running the above line of code
 Server.local.options.memSize = 16384;
 ::
 
-One can also give different overlap settings per stretch band
-I think the best results come from [2,2,2,2,2,2,2,4,4] with a default sine envelope for the 2 overlaps
-
-code::
-
-TimeStretch2.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10B.wav", 100, 65536, [2,2,2,2,2,2,2,4,4]);
-
-::
-
-Using the numSplits argument:
+Using the numSplits argument. Best used for transients, so they do not smear over a 65536 size fft.
 
 code::
 
 //will work with mono, stereo, or even N channel files
-
-TimeStretch2.stretch(Platform.resourceDir +/+ "sounds/a11wlk01.wav", Platform.recordingsDir +/+ "a11wlk01_10d.wav", 10, numSplits:4);
+TimeStretch2.stretch("Bieber_resonance.wav", 100, numSplits:9);
+TimeStretch2.stretch("Bieber_transients.wav", 100, numSplits:4);
 ::
 
 
