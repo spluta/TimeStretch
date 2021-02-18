@@ -44,7 +44,7 @@ Path to the input file to be stretch. Can be a mono or stereo file.
 
 argument::durMult
 
-	How many times longer the outFile will be than the inFile. Goes waaaaay past 11 (try 100!).
+	How many times longer the outFile will be than the inFile. Goes waaaaay past 11 (try 100!). Must be an integer. Will round to the nearest integer if it receives a float.
 
 argument::chanNum
 

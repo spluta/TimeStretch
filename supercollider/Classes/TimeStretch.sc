@@ -212,10 +212,11 @@ TimeStretch {
 			"winSize ".post;
 			windowSize.postln;
 
-			numFrames = frameChunk/(windowSize/2);
-
 			step = (windowSize/2)/durMult;
-			"step ".postln; step.postln;
+			"step: ".post; step.postln;
+
+			numFrames = frameChunk/step/durMult;
+			"numFrames: ".post; numFrames.postln;
 
 			if(fCNum==0){
 				arrayA = Array.fill(windowSize, {0});
@@ -230,6 +231,7 @@ TimeStretch {
 			frames = (0..(numFrames-1)).collect{|frameNum|
 				var tempArray;
 				pointer = (fCNum*(chunkSize/durMult))+(frameNum*step)-(windowSize/2+binShiftSamples);
+				//pointer.postln;
 				if(pointer<0){
 					tempArray = floatArray.copyRange(0, (pointer.floor+windowSize).asInteger);
 					tempArray = FloatArray.fill(windowSize-tempArray.size, {0}).addAll(tempArray);
@@ -308,12 +310,17 @@ TimeStretch {
 
 	*stretchChan {|inFile, durMult=100, chanNum=0, splits = 9, filterOrder=129, fftType = 0|
 		var winType=0, binShift=0, maxWindowSize = 65536, windowSizes;
-		var chunkSize = 6553600, temp, sfFinal, floatArray;
+		var chunkSize, temp, sfFinal, floatArray;
 
 		var numSamplesToProcess, sf;
 		var totalFrames, totalChunks, frameChunks, tempDir;
 		var lastArrayA;
 		var extension, time = Main.elapsedTime;
+
+		if(durMult.isFloat){
+			durMult = durMult.asInteger;
+			"durMult must be an integer. Rounding to: ".post; durMult.postln;
+		};
 
 		if(splits.size==0){
 			windowSizes = (maxWindowSize/(2**(0..8))).asInteger.copyRange(9-splits, 8).postln;
@@ -332,6 +339,8 @@ TimeStretch {
 		numSamplesToProcess.postln;
 
 		totalFrames = numSamplesToProcess*durMult;
+
+		chunkSize = maxWindowSize*durMult;
 
 		totalChunks = (totalFrames/(chunkSize)).ceil;
 		frameChunks = Array.fill(totalChunks, {chunkSize});
@@ -355,8 +364,9 @@ TimeStretch {
 		frameChunks.size.do{|fCNum|
 			lastArrayA = this.processChunk(server, sfFinal, floatArray, chanNum, windowSizes, maxWindowSize, durMult, chunkSize, frameChunks, fCNum, lastArrayA, serverNum, fftType, binShift, filterOrder);
 		};
+
+		"all stretched! closing file: ".postln; sfFinal.path.postln;
 		sfFinal.close;
-		"all stretched! closing file.".postln;
 		("Time to Stretch: "++(Main.elapsedTime-time)).postln;
 	}
 
