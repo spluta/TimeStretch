@@ -37,7 +37,7 @@ TimeStretch2 {
 
 				sum = RunningSum.ar((sig[0]*sig[1]), fftSize/2)/RunningSum.ar((sig[0]*sig[0]), fftSize/2);
 
-				rVal = Latch.ar(sum, trig1+trig2).clip(-1,1);
+				rVal = Latch.ar(sum, DelayC.ar(trig1+trig2, (3*fftMax/2)-(3*fftSize/2)+BlockSize.ir/SampleRate.ir, fftMax-fftSize+BlockSize.ir/SampleRate.ir)).clip(-1,1);
 
 				rVal = DelayC.ar(rVal, trigPeriod/2, trigPeriod/2);
 

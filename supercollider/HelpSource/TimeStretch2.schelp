@@ -5,7 +5,7 @@ categories::  UGens>FFT
 
 Description::
 
-Though much slower, TimeStretch is preferred, as it sounds much better. TimeStretch2 is provided more as a convenience, though I cannot guarantee its accuracy. TimeStretch2 also does not work on files with a sample rate other than 44100.
+Though much slower, TimeStretch is preferred, as it sounds much better. TimeStretch2 is provided more as an experimental convenience, and I cannot guarantee its accuracy. TimeStretch2 also does not work on files with a sample rate other than 44100.
 
 Implements a phase randomized FFT time stretch algorithm, the Ness Stretch, which splits the original sound file into 9 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency. Starting with a largest frame of 65536, the algorithm will use the following frequency/frame size breakdown:
 
