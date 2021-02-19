@@ -1,5 +1,5 @@
 class:: TimeStretch2
-summary:: Time Stretch
+summary:: Server Side Time Stretch
 related:: Classes/FFT, Classes/IFFT, Classes/PV_Diffuser, Classes/PV_BrickWall
 categories::  UGens>FFT
 

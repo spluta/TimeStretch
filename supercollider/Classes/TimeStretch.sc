@@ -324,11 +324,6 @@ TimeStretch {
 		var lastArrayA;
 		var extension, time = Main.elapsedTime;
 
-/*		if(durMult.isFloat){
-			durMult = durMult.asInteger;
-			"durMult must be an integer. Rounding to: ".post; durMult.postln;
-		};*/
-
 		if(splits.size==0){
 			windowSizes = (maxWindowSize/(2**(0..8))).asInteger.copyRange(9-splits, 8).postln;
 		}{
@@ -347,9 +342,6 @@ TimeStretch {
 
 		totalFrames = numSamplesToProcess*durMult;
 
-		/*chunkMul = durMult;
-		while({chunkMul%2==0}, {chunkMul=(chunkMul/2)});
-		chunkSize = (maxWindowSize*chunkMul).asInteger;*/
 		chunkSize = 65536;
 
 		totalChunks = (totalFrames/(chunkSize)).ceil;
