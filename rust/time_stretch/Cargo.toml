@@ -1,0 +1,17 @@
+[package]
+name = "time_stretch"
+version = "0.1.0"
+authors = ["Sam <spluta@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+rustfft = "6.0.1"
+realfft = "2.0.1"
+rand="0.8.0"
+hound = "3.4.0"
+chrono = "0.4"
+clap = "2.33.3"
+bwavfile = "0.9.3"

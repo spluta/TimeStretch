@@ -411,47 +411,47 @@ TimeStretch {
 	}
 
 
-	// *transientSeparation {|inFile|
-	// 	var t1, t2, r1, r2, buf;
-	// 	var fileName;
-	// 	var resFileOut, transFileOut, tempDir;
-	//
-	// 	this.getServer;
-	//
-	// 	fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
-	//
-	// 	resFileOut = fileName++"_resonance.wav";
-	// 	if(transFileOut==nil){transFileOut = fileName++"_transients.wav"};
-	//
-	// 	server.waitForBoot{
-	//
-	// 		buf = Buffer.read(server, inFile, action:{|buffy|
-	//
-	// 			t1 = Buffer.new(server);
-	// 			r1 = Buffer.new(server);
-	// 			t2 = Buffer.new(server);
-	// 			r2 = Buffer.new(server);
-	// 			"separating".postln;
-	// 			FluidBufTransients.process(server, buffy, 0, -1, 0, -1, t1, r1, 40, 1024, 256, 10, 2, 1.1, 14, 25,
-	// 				action:{|trans, res|
-	// 					"separating again".postln;
-	// 					FluidBufTransients.process(server, res, 0, -1, 0, -1, t2, r2, 40, 512, 256, 10, 2, 1.1, 14, 25,
-	// 						action:{|trans2, res2|
-	// 							res2.write(resFileOut);
-	// 							FluidBufCompose.process(server, trans, destination:trans2, destGain:1, action:{|finTrans|
-	// 								{
-	// 									"putting back together".postln;
-	// 									finTrans.write(transFileOut);
-	// 									server.sync;
-	// 									server.quit;
-	// 									server = nil;
-	// 								}.fork;
-	// 							})
-	// 					})
-	// 			});
-	// 		});
-	// 	}
-	// }
+	 *transientSeparation {|inFile|
+	 	var t1, t2, r1, r2, buf;
+	 	var fileName;
+	 	var resFileOut, transFileOut, tempDir;
+
+	 	this.getServer;
+
+	 	fileName = PathName(inFile).pathOnly++PathName(inFile).fileNameWithoutExtension;
+
+	 	resFileOut = fileName++"_resonance.wav";
+	 	if(transFileOut==nil){transFileOut = fileName++"_transients.wav"};
+
+	 	server.waitForBoot{
+
+	 		buf = Buffer.read(server, inFile, action:{|buffy|
+
+	 			t1 = Buffer.new(server);
+	 			r1 = Buffer.new(server);
+	 			t2 = Buffer.new(server);
+	 			r2 = Buffer.new(server);
+	 			"separating".postln;
+	 			FluidBufTransients.process(server, buffy, 0, -1, 0, -1, t1, r1, 40, 1024, 256, 10, 2, 1.1, 14, 25,
+	 				action:{|trans, res|
+	 					"separating again".postln;
+	 					FluidBufTransients.process(server, res, 0, -1, 0, -1, t2, r2, 40, 512, 256, 10, 2, 1.1, 14, 25,
+	 						action:{|trans2, res2|
+	 							res2.write(resFileOut);
+	 							FluidBufCompose.process(server, trans, destination:trans2, destGain:1, action:{|finTrans|
+	 								{
+	 									"putting back together".postln;
+	 									finTrans.write(transFileOut);
+	 									server.sync;
+	 									server.quit;
+	 									server = nil;
+	 								}.fork;
+	 							})
+	 					})
+	 			});
+	 		});
+	 	}
+	 }
 
 
 }
