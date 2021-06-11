@@ -130,9 +130,9 @@ fn main() {
         let mut cutty = vec![0.0_f64; 0];
         //add low_cut, then hi_cut
         if iter==(num_slices-1) {
-            cutty.push(0.0)
-        } else {cutty.push(63.0)}
-        cutty.push(127.0);
+            cutty.push(1.0)
+        } else {cutty.push(64.0)}
+        cutty.push(128.0);
         cut_offs[iter] = cutty;
     }
     //println!("win_lens {:?}", win_lens);
@@ -149,7 +149,7 @@ fn main() {
         //all dependent on win_len ----
         
         for slice_num in 0..win_lens.len() {
-            
+        //for slice_num in 2..4 {    
             let win_len = win_lens[slice_num];
             let mut part = vec![0.0; win_len];
 
@@ -165,6 +165,15 @@ fn main() {
             
             let in_win = make_paul_window(win_len);
             let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][1], 64.0);
+            //alternate brick wall ----->
+            // let mut filt_win = vec![1.0; win_len/2+1];
+            // for iter in 0..cut_offs[slice_num][0] as usize {
+            //     filt_win[iter] = 0.0;
+            // }
+            // for iter in cut_offs[slice_num][1] as usize..filt_win.len() {
+            //     filt_win[iter] = 0.0;
+            // }
+
             let hop = (win_len as f32 / 2.0) / dur_mult as f32;
             
             //println!("{}, {}", "initial_length", initial_len);
@@ -195,10 +204,10 @@ fn main() {
                 r2c.process(&mut part, &mut spectrum).unwrap();
                 //println!("{}", spectrum.len());
                 //println!("{}", filt_win.len());
-                for iter in 1..spectrum.len() {
+                for iter in 0..spectrum.len() {
                     let mut temp = spectrum[iter].to_polar();
-                    temp.0 *= filt_win[iter];
-                    temp.1 = rng.gen_range(-2.0f64..2.0f64);
+                    temp.0 = temp.0 * filt_win[iter];
+                    temp.1 = rng.gen_range(-PI/2.0..PI/2.0);
                     spectrum[iter] = Complex::from_polar(temp.0, temp.1);
                 }
                 c2r.process(&mut spectrum, &mut out_frame).unwrap();
@@ -225,7 +234,7 @@ fn main() {
                 }
 
                 let ness_window = make_ness_window(win_len, correlation.abs());
-                
+                let mut out_frame2 = c2r.make_output_vec();
                 for i in 0..(win_len/2) {
                     out_frame2[i] = flipped_frame[i] * ness_window[i] + last_framevec[i + win_len/2] * ness_window[i + win_len/2];
                 }
@@ -262,13 +271,15 @@ fn main() {
     println!("{:?}", now.elapsed());
 }
 
-fn make_ness_window(len: usize, correlation: f64) -> Vec<f64> {
+fn make_ness_window(mut len: usize, correlation: f64) -> Vec<f64> {
 
     let mut floats: Vec<f64> = vec![0.0; len];
     let mut vals: Vec<f64> = vec![0.0; len];
+  len = len-1;
   for iter in 0..(len) {
     floats[iter] = iter as f64 / (len as f64 / 2.0);
   }
+  floats.push(0.0);
     for iter in 0..len {
         let fs = f64::powf((floats[iter]*PI/2.0).tan(), 2.0);
         vals [iter] = fs*(1.0/(1.0+(2.0*fs*(correlation))+f64::powf(fs, 2.0))).sqrt();
@@ -297,7 +308,7 @@ fn make_lr_hp_window(len: usize, low_bin: f64, order: f64)-> Vec<f64> {
 }
 
 fn make_lr_bp_window(len: usize, low_bin: f64, hi_bin: f64, order: f64) -> Vec<f64> {
-    let mut filter: Vec<f64>;
+    let filter: Vec<f64>;
     if low_bin<=0.0 {
         filter = make_lr_lp_window(len, hi_bin, order);
     } else {

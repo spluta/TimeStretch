@@ -137,10 +137,14 @@ TimeStretch {
 			(0, 0.01..1.0).do{|correlation|
 				switch(winType,
 					0, {
-						window = Signal.newClear(windowSize).waveFill({|fs|
+						/*window = Signal.newClear(windowSize).waveFill({|fs|
 							fs = (fs*pi/2).tan**2;
 							fs*((1/(1+(2*fs*(correlation))+(fs**2))).sqrt)
-						}, 0, 2);
+						}, 0, 2);*/
+						window = Signal.newClear(windowSize-1).waveFill({|fs|
+							fs = (fs*pi/2).tan**2;
+							fs*((1/(1+(2*fs*(1))+(fs**2))).sqrt)
+						}, 0, 2).add(0.0)
 
 					},
 					1, {
