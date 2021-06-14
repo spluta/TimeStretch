@@ -11,10 +11,6 @@ use std::path::Path;
 use std::time::SystemTime;
 
 fn main() {
-    // let args: Vec<String> = env::args().collect();
-    // let file_name = &args[1];
-    // let num = &args[2];
-    // let out_name = &args[3];
     let matches = App::new("NessStretch")
     .version("0.1.0")
     .author("Sam Pluta and Alex Ness")
@@ -24,7 +20,7 @@ fn main() {
         .short("f")
         .long("file")
         .takes_value(true)
-        .help("An audio file you want to stretch"),
+        .help("An audio file you want to stretch. Must be a wav file. Can be of any bit depth, up to 32 bit float."),
     )
     .arg(
         Arg::with_name("mult")
@@ -140,6 +136,8 @@ fn main() {
     
     for channel in 0..sound_file.spec().channels {
         let mut indata = vec![0.0_f64; 65536];
+
+        //println!("channel {}", channel);
         
         indata.append(&mut channels[channel as usize]);
         
@@ -150,6 +148,7 @@ fn main() {
         
         for slice_num in 0..win_lens.len() {
         //for slice_num in 2..4 {    
+            println!("channel {} slice layer: {} of {}", channel, slice_num, win_lens.len());
             let win_len = win_lens[slice_num];
             let mut part = vec![0.0; win_len];
 
@@ -251,6 +250,8 @@ fn main() {
         println!("{:?}", now.elapsed());
     } //end of channel loop
     
+    out_channels = normalize(out_channels);
+
     let spec = hound::WavSpec {
         channels: sound_file.spec().channels,
         sample_rate: sound_file.spec().sample_rate,
@@ -269,6 +270,23 @@ fn main() {
     writer.finalize().unwrap();
     
     println!("{:?}", now.elapsed());
+}
+
+fn normalize (mut chans: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    let mut max = 0.0;
+    let chans_iter = chans.iter();
+    for chan in chans_iter{
+        for i2 in 0..chans[0].len() {
+            if chan[i2]>max {max = chan[i2]}
+        }
+    }
+    let chans_iter = chans.iter_mut();
+    for chan in chans_iter{
+        for i2 in 0..chan.len() {
+            chan[i2] /= max;
+        }
+    }
+    return chans;
 }
 
 fn make_ness_window(mut len: usize, correlation: f64) -> Vec<f64> {
