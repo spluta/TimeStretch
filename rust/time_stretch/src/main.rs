@@ -38,6 +38,13 @@ fn main() {
         .takes_value(true)
         .help("The number of slices of the spectrum (optional - default is 9 - 4 is nice for transients/perc)"),
     )
+    .arg(
+        Arg::with_name("extreme")
+        .short("e")
+        .long("extreme")
+        .takes_value(true)
+        .help("Setting to 1 enables an extreme version of the NessStretch (of dubious quality increase) which splits each spectral slice into 4 additional slices, which are each correlated independently. (Default 0)"),
+    )
     .get_matches();
     
     let file_name = matches.value_of("file").unwrap_or("sound/tng.wav");
@@ -51,6 +58,17 @@ fn main() {
             return;
         }
     };
+
+    let e_in = matches.value_of("extreme").unwrap_or("0");
+    let mut extreme: usize = match e_in.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            eprintln!("error: extreme argument not an integer");
+            return;
+        }
+    };
+    if extreme > 1 {extreme = 0};
+    println!("Extreme setting set to: {}", extreme);
     
     let s_in = matches.value_of("slices").unwrap_or("9");
     let num_slices: usize = match s_in.parse() {
@@ -70,7 +88,7 @@ fn main() {
     
     println!("");
     println!("Will process up to a 10 channel audio file in parallel. Anything beyond 10 channels will result in a 10 channel file.");
-
+    
     let mut sound_file = hound::WavReader::open(file_name).unwrap();
     let mut intemp = vec![0.0; 0];
     
@@ -142,54 +160,54 @@ fn main() {
     thread::scope(|s| {
         
         s.spawn(|_| {
-            out_channel0 = process_channel(0, channel0, num_slices, dur_mult);
+            out_channel0 = process_channel(0, channel0, num_slices, dur_mult, extreme);
         });
         
         s.spawn(|_| {
             if channels.len()>1 { 
-                out_channel1 = process_channel(1, channel1, num_slices, dur_mult)
+                out_channel1 = process_channel(1, channel1, num_slices, dur_mult, extreme)
             }
         });
         
         s.spawn(|_| {
             if channels.len()>2 { 
-                out_channel2 = process_channel(2, channel2, num_slices, dur_mult)
+                out_channel2 = process_channel(2, channel2, num_slices, dur_mult, extreme)
             }
         });
         
         s.spawn(|_| {
             if channels.len()>3 { 
-                out_channel3 = process_channel(3, channel3, num_slices, dur_mult)
+                out_channel3 = process_channel(3, channel3, num_slices, dur_mult, extreme)
             }
         });
         s.spawn(|_| {
             if channels.len()>4 { 
-                out_channel4 = process_channel(4, channel4, num_slices, dur_mult)
+                out_channel4 = process_channel(4, channel4, num_slices, dur_mult, extreme)
             }
         });
         s.spawn(|_| {
             if channels.len()>5 { 
-                out_channel5 = process_channel(5, channel5, num_slices, dur_mult)
+                out_channel5 = process_channel(5, channel5, num_slices, dur_mult, extreme)
             }
         });
         s.spawn(|_| {
             if channels.len()>6 { 
-                out_channel6 = process_channel(6, channel6, num_slices, dur_mult)
+                out_channel6 = process_channel(6, channel6, num_slices, dur_mult, extreme)
             }
         });
         s.spawn(|_| {
             if channels.len()>7 { 
-                out_channel7 = process_channel(7, channel7, num_slices, dur_mult)
+                out_channel7 = process_channel(7, channel7, num_slices, dur_mult, extreme)
             }
         });
         s.spawn(|_| {
             if channels.len()>8 { 
-                out_channel8 = process_channel(8, channel8, num_slices, dur_mult)
+                out_channel8 = process_channel(8, channel8, num_slices, dur_mult, extreme)
             }
         });
         s.spawn(|_| {
             if channels.len()>9 { 
-                out_channel9 = process_channel(9, channel9, num_slices, dur_mult)
+                out_channel9 = process_channel(9, channel9, num_slices, dur_mult, extreme)
             }
         });
         
@@ -208,7 +226,7 @@ fn main() {
     if channels.len()>7 {out_channels[7] = out_channel7};
     if channels.len()>8 {out_channels[8] = out_channel8};
     if channels.len()>9 {out_channels[9] = out_channel9}; 
-
+    
     out_channels = normalize(out_channels);
     
     let spec = hound::WavSpec {
@@ -231,21 +249,70 @@ fn main() {
     println!("{:?}", now.elapsed());
 }
 
-fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, dur_mult: f64) -> Vec<f64> {
+fn process_microframe (spectrum:Vec<Complex<f64>>, last_framevec:Vec<f64>, filt_win: Vec<f64>) -> Vec<f64> {
+    let win_len = (spectrum.len()-1)*2;
     
-    let mut rng = rand::thread_rng();
+    let mut real_planner = RealFftPlanner::<f64>::new();
     
+    let ifft = real_planner.plan_fft_inverse(win_len);
+    let mut out_frame = ifft.make_output_vec();
+    let mut flipped_frame = vec![0.0; win_len];
+    
+    let mut spectrum_out = real_planner.plan_fft_forward(win_len).make_output_vec();
+    
+    for iter in 0..spectrum.len() {
+        let mut temp = spectrum[iter].to_polar();
+        temp.0 = temp.0 * filt_win[iter];
+        temp.1 = rand::thread_rng().gen_range(-PI/2.0..PI/2.0);
+        spectrum_out[iter] = Complex::from_polar(temp.0, temp.1);
+    }
+    ifft.process(&mut spectrum_out, &mut out_frame).unwrap();
+    
+    let half_vec0 = &last_framevec[win_len/2..];
+    let half_vec1 = &out_frame[..win_len/2];
+    
+    let mut correlation = 0.0;
+    let temp_sum:f64 = half_vec0.iter().sum();
+    if temp_sum != 0.0 {
+        let r: f64 = half_vec0.iter().zip(half_vec1.iter()).map(|(x, y)| x * y).sum();
+        let s: f64 = half_vec0.iter().zip(half_vec0.iter()).map(|(x, y)| x * y).sum();
+        correlation = r/s;
+    }
+    
+    for i in 0..win_len {
+        if correlation<0.0 {
+            flipped_frame[i] = -1.0*out_frame[i];
+        } else {
+            flipped_frame[i] = out_frame[i];
+        }
+    }
+    
+    let ness_window = make_ness_window(win_len, correlation.abs());
+    let mut out_frame2 = vec![0.0; 3*win_len/2];
+    for i in 0..(win_len/2) {
+        out_frame2[i] = flipped_frame[i] * ness_window[i] + last_framevec[i + win_len/2] * ness_window[i + win_len/2];
+        
+    }
+    for i in 0..win_len {
+        out_frame2[i+win_len/2] = flipped_frame[i];
+    }
+    return out_frame2;
+}
+
+//,  sc: &crossbeam_utils::thread::Scope<'_>
+fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, extreme: usize) -> Vec<f64> {    
     let mut win_lens = vec![0_usize; 0];
+    
     let mut cut_offs = vec![vec![0.0_f64; 0]; num_slices];
+    
     for iter in 0..num_slices {
         let size = i32::pow(2,iter as u32 + 8);
         win_lens.push(size as usize);
-        let mut cutty = vec![0.0_f64; 0];
+        let cutty:Vec<f64>;
         //add low_cut, then hi_cut
         if iter==(num_slices-1) {
-            cutty.push(1.0)
-        } else {cutty.push(64.0)}
-        cutty.push(128.0);
+            cutty = vec![1.0,32.0, 64.0, 96.0, 128.0];
+        } else {cutty = vec![64.0, 80.0, 96.0, 112.0, 128.0];}
         cut_offs[iter] = cutty;
     }
     
@@ -255,186 +322,194 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
     
     indata.append(&mut channel);
     
-    
     indata.append(&mut vec![0.0_f64; 2 * 65536 - (indata.len() % 65536)]);
     
     let mut outdata = vec![0.0_f64; (in_size as f64 * dur_mult + 65536.0) as usize];
     //all dependent on win_len ----
     
     for slice_num in 0..win_lens.len() {
-        //for slice_num in 2..4 {    
-            println!("channel {} slice layer: {} of {}", chan_num, slice_num, win_lens.len());
-            let win_len = win_lens[slice_num];
-            let mut part = vec![0.0; win_len];
-            
-            // make a planner
-            let mut real_planner = RealFftPlanner::<f64>::new();
-            let fft = real_planner.plan_fft_forward(win_len);
-            let mut spectrum = fft.make_output_vec();
-            
-            let ifft = real_planner.plan_fft_inverse(win_len);
-            let mut out_frame = ifft.make_output_vec();
-            let mut flipped_frame = vec![0.0; win_len+1];
-            
-            let in_win = make_paul_window(win_len);
-            let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][1], 64.0);
-            
-            
-            let hop = (win_len as f64 / 2.0) / dur_mult;
-            
-            let mut stretch_points = vec![0; (in_size as f64 / hop) as usize];
-            
-            for iter in 0..stretch_points.len() {
-                stretch_points[iter] = (hop * iter as f64) as i32 + (32768 - win_len / 2) as i32;
-            }
-            
-            let mut out_points = vec![0; stretch_points.len()];
-            
-            for iter in 0..out_points.len() {
-                out_points[iter] = (iter * win_len / 2)+ (32768 - win_len / 2);
-            }
-            
-            let mut last_framevec = vec![0.0; win_len];
-            
-            for big_iter in 0..stretch_points.len() {
-                
-                
+        println!("channel {} slice layer: {} of {}", chan_num, slice_num, win_lens.len());
+        let win_len = win_lens[slice_num];
+        
+        let in_win = make_paul_window(win_len);
+        
+        let hop = (win_len as f64 / 2.0) / dur_mult;
+        
+        let mut stretch_points = vec![0; (in_size as f64 / hop) as usize];
+        
+        for iter in 0..stretch_points.len() {
+            stretch_points[iter] = (hop * iter as f64) as i32 + (32768 - win_len / 2) as i32;
+        }
+        
+        let mut out_points = vec![0; stretch_points.len()];
+        
+        for iter in 0..out_points.len() {
+            out_points[iter] = (iter * win_len / 2)+ (32768 - win_len / 2);
+        }
+        
+        let mut last_frame0 = vec![0.0; win_len];
+        let mut last_frame1 = vec![0.0; win_len];
+        let mut last_frame2 = vec![0.0; win_len];
+        let mut last_frame3 = vec![0.0; win_len];
+        
+        let mut out_frame0 = vec![0.0; 3*win_len/2];
+        let mut out_frame1 = vec![0.0; 3*win_len/2];
+        let mut out_frame2 = vec![0.0; 3*win_len/2];
+        let mut out_frame3 = vec![0.0; 3*win_len/2];
+        
+        for big_iter in 0..stretch_points.len() {
+                let mut real_planner = RealFftPlanner::<f64>::new();
+                let fft = real_planner.plan_fft_forward(win_len);
+                let mut spectrum = fft.make_output_vec();
+                let mut part = vec![0.0; win_len];
                 for i in 0..win_len {
                     part[i] = indata[(stretch_points[big_iter] + i as i32) as usize] * in_win[i];
                 }
-                
                 fft.process(&mut part, &mut spectrum).unwrap();
-                
-                for iter in 0..spectrum.len() {
-                    let mut temp = spectrum[iter].to_polar();
-                    temp.0 = temp.0 * filt_win[iter];
-                    temp.1 = rng.gen_range(-PI/2.0..PI/2.0);
-                    spectrum[iter] = Complex::from_polar(temp.0, temp.1);
-                }
-                ifft.process(&mut spectrum, &mut out_frame).unwrap();
-                
-                let half_vec0 = &last_framevec[win_len/2..];
-                
-                let half_vec1 = &out_frame[..win_len/2];
-                
-                let mut correlation:f64 = 0.0;
-                let temp_sum:f64 = half_vec0.iter().sum();
-                if temp_sum != 0.0 {
-                    let r: f64 = half_vec0.iter().zip(half_vec1.iter()).map(|(x, y)| x * y).sum();
-                    let s: f64 = half_vec0.iter().zip(half_vec0.iter()).map(|(x, y)| x * y).sum();
-                    correlation = r/s;
-                }
-                
-                for i in 0..win_len {
-                    if correlation<0.0 {
-                        flipped_frame[i] = -1.0*out_frame[i];
-                    } else {
-                        flipped_frame[i] = out_frame[i];
+                if extreme<1 {
+                    let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][4], 64.0);
+                    
+                    out_frame0 = process_microframe(spectrum, last_frame0.clone(), filt_win);
+                    for i in 0..(win_len) {
+                        last_frame0[i] = out_frame0[i+win_len/2];
+                    }
+                    for i in 0..(win_len/2) {
+                        outdata[out_points[big_iter] as usize + i] += (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i])/ win_len as f64; //you have to divide by the sqrt
+                    }
+                } else {
+                    thread::scope(|s| {
+                    let spectrum0 = spectrum.clone();
+                    let spectrum1 = spectrum.clone();
+                    let spectrum2 = spectrum.clone();
+                    let spectrum3 = spectrum.clone();
+                    s.spawn(|_| {
+                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][1], 64.0);
+                        
+                        out_frame0 = process_microframe(spectrum0, last_frame0.clone(), filt_win);
+                        for i in 0..(win_len) {
+                            last_frame0[i] = out_frame0[i+win_len/2];
+                        }
+                    });
+                    s.spawn(|_| {
+                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][1], cut_offs[slice_num][2], 64.0);
+                        // let mut part = vec![0.0; win_len];
+                        // for i in 0..win_len {
+                            //     part[i] = indata[(stretch_points[big_iter] + i as i32) as usize] * in_win[i];
+                            // }
+                            //let mut spectrum1 = spectrum.clone();
+                            out_frame1 = process_microframe(spectrum1, last_frame1.clone(), filt_win);
+                            for i in 0..(win_len) {
+                                last_frame1[i] = out_frame1[i+win_len/2];
+                            }
+                        });
+                        s.spawn(|_| {
+                            let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][2], cut_offs[slice_num][3], 64.0);
+                            out_frame2 = process_microframe(spectrum2, last_frame2.clone(), filt_win);
+                            for i in 0..(win_len) {
+                                last_frame2[i] = out_frame2[i+win_len/2];
+                            }
+                        });
+                        s.spawn(|_| {
+                            let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][3], cut_offs[slice_num][4], 64.0);
+                            out_frame3 = process_microframe(spectrum3, last_frame3.clone(), filt_win);
+                            for i in 0..(win_len) {
+                                last_frame3[i] = out_frame3[i+win_len/2];
+                            }
+                        });
+                    }).unwrap();
+                    for i in 0..(win_len/2) {
+                        outdata[out_points[big_iter] as usize + i] += (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i])/ win_len as f64; //you have to divide by the sqrt
                     }
                 }
-                
-                let ness_window = make_ness_window(win_len, correlation.abs());
-                let mut out_frame2 = ifft.make_output_vec();
-                for i in 0..(win_len/2) {
-                    out_frame2[i] = flipped_frame[i] * ness_window[i] + last_framevec[i + win_len/2] * ness_window[i + win_len/2];
-                }
-                
-                last_framevec = flipped_frame.clone();
-                
-                for i in 0..(win_len/2) {
-                    outdata[out_points[big_iter] as usize + i] += out_frame2[i]/ win_len as f64; //you have to divide by the sqrt
-                }
-                
-            }
+            };
         }
-        return outdata;
+    return outdata;
+}
+
+fn normalize (mut chans: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    let mut max = 0.0;
+    let chans_iter = chans.iter();
+    for chan in chans_iter{
+        for i2 in 0..chans[0].len() {
+            if chan[i2]>max {max = chan[i2]}
+        }
     }
-    
-    fn normalize (mut chans: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-        let mut max = 0.0;
-        let chans_iter = chans.iter();
-        for chan in chans_iter{
-            for i2 in 0..chans[0].len() {
-                if chan[i2]>max {max = chan[i2]}
-            }
+    for chan_num in 0..chans.len(){
+        for i2 in 0..chans[0].len() {
+            chans[chan_num][i2] /= max;
         }
-        let chans_iter = chans.iter_mut();
-        for chan in chans_iter{
-            for i2 in 0..chan.len() {
-                chan[i2] /= max;
-            }
-        }
-        return chans;
     }
+    return chans;
+}
+
+fn make_ness_window(mut len: usize, correlation: f64) -> Vec<f64> {
     
-    fn make_ness_window(mut len: usize, correlation: f64) -> Vec<f64> {
-        
-        let mut floats: Vec<f64> = vec![0.0; len];
-        let mut vals: Vec<f64> = vec![0.0; len];
-        len = len-1;
-        for iter in 0..(len) {
-            floats[iter] = iter as f64 / (len as f64 / 2.0);
-        }
-        floats.push(0.0);
-        for iter in 0..len {
-            let fs = f64::powf((floats[iter]*PI/2.0).tan(), 2.0);
-            vals [iter] = fs*(1.0/(1.0+(2.0*fs*(correlation))+f64::powf(fs, 2.0))).sqrt();
-        }
-        return vals
+    let mut floats: Vec<f64> = vec![0.0; len];
+    let mut vals: Vec<f64> = vec![0.0; len];
+    len = len-1;
+    for iter in 0..(len) {
+        floats[iter] = iter as f64 / (len as f64 / 2.0);
     }
-    
-    fn make_lr_lp_window(len: usize, hi_bin: f64, order: f64)-> Vec<f64> {
-        let mut filter = vec![1.0; len];
-        if hi_bin!=0.0 {
-            for i in 0..len {
-                filter[i] = 1.0/(1.0+(f64::powf(i as f64/hi_bin,order)));
-            }
-        }
-        return filter;
+    floats.push(0.0);
+    for iter in 0..len {
+        let fs = f64::powf((floats[iter]*PI/2.0).tan(), 2.0);
+        vals [iter] = fs*(1.0/(1.0+(2.0*fs*(correlation))+f64::powf(fs, 2.0))).sqrt();
     }
-    
-    fn make_lr_hp_window(len: usize, low_bin: f64, order: f64)-> Vec<f64> {
-        let mut filter = vec![1.0; len];
-        if low_bin!=0.0 {
-            for i in 0..len {
-                filter[i] = 1.0-(1.0/(1.0+(f64::powf(i as f64/low_bin,order))));
-            }
-        }
-        return filter;
-    }
-    
-    fn make_lr_bp_window(len: usize, low_bin: f64, hi_bin: f64, order: f64) -> Vec<f64> {
-        let filter: Vec<f64>;
-        if low_bin<=0.0 {
-            filter = make_lr_lp_window(len, hi_bin, order);
-        } else {
-            if hi_bin>=(len-2) as f64{
-                filter = make_lr_hp_window(len, low_bin, order);
-            } else {
-                let lp = make_lr_lp_window(len, hi_bin, order);
-                let hp = make_lr_hp_window(len, low_bin, order);
-                filter = lp.iter().zip(hp.iter()).map(|(x, y)| x * y).collect();
-            }
-        }
-        return filter
-    }
-    
-    fn make_paul_window(len: usize) -> Vec<f64> {
-        let mut part = vec![0.0; len];
+    return vals
+}
+
+fn make_lr_lp_window(len: usize, hi_bin: f64, order: f64)-> Vec<f64> {
+    let mut filter = vec![1.0; len];
+    if hi_bin!=0.0 {
         for i in 0..len {
-            let value = i as f64 / (len as f64 - 1.0) * 2.0 - 1.0;
-            let value = f64::powf(1.0 - (f64::powf(value, 2.0)), 1.25);
-            part[i] = value;
+            filter[i] = 1.0/(1.0+(f64::powf(i as f64/hi_bin,order)));
         }
-        return part;
     }
-    
-    fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>>
-    where
-    T: Clone,
-    {
-        assert!(!v.is_empty());
-        (0..v[0].len())
-        .map(|i| v.iter().map(|inner| inner[i].clone()).collect::<Vec<T>>())
-        .collect()
+    return filter;
+}
+
+fn make_lr_hp_window(len: usize, low_bin: f64, order: f64)-> Vec<f64> {
+    let mut filter = vec![1.0; len];
+    if low_bin!=0.0 {
+        for i in 0..len {
+            filter[i] = 1.0-(1.0/(1.0+(f64::powf(i as f64/low_bin,order))));
+        }
     }
+    return filter;
+}
+
+fn make_lr_bp_window(len: usize, low_bin: f64, hi_bin: f64, order: f64) -> Vec<f64> {
+    let filter: Vec<f64>;
+    if low_bin<=0.0 {
+        filter = make_lr_lp_window(len, hi_bin, order);
+    } else {
+        if hi_bin>=(len-2) as f64{
+            filter = make_lr_hp_window(len, low_bin, order);
+        } else {
+            let lp = make_lr_lp_window(len, hi_bin, order);
+            let hp = make_lr_hp_window(len, low_bin, order);
+            filter = lp.iter().zip(hp.iter()).map(|(x, y)| x * y).collect();
+        }
+    }
+    return filter
+}
+
+fn make_paul_window(len: usize) -> Vec<f64> {
+    let mut part = vec![0.0; len];
+    for i in 0..len {
+        let value = i as f64 / (len as f64 - 1.0) * 2.0 - 1.0;
+        let value = f64::powf(1.0 - (f64::powf(value, 2.0)), 1.25);
+        part[i] = value;
+    }
+    return part;
+}
+
+fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>>
+where
+T: Clone,
+{
+    assert!(!v.is_empty());
+    (0..v[0].len())
+    .map(|i| v.iter().map(|inner| inner[i].clone()).collect::<Vec<T>>())
+    .collect()
+}
