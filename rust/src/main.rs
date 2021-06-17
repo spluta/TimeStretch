@@ -43,7 +43,10 @@ fn main() {
         .short("e")
         .long("extreme")
         .takes_value(true)
-        .help("Setting to 1 enables an extreme version of the NessStretch (of dubious quality increase) which splits each spectral slice into 4 additional slices, which are each correlated independently. (Default 0)"),
+        .help("In addition to the standard NessStretch (default 0), there are 3 extreme modes (more cpu) set by this flag. 
+        1 - breaks the (9) slices spectral slices into 4 more slices, and correlates those independently
+        2 - makes 4 versions of each frame and chooses the one that best correlates with the previous frame
+        3 - combination of 1 and 2: breaking the spectral slice into 2 slices, processes each twice, and chooses the best version per slice"),
     )
     .get_matches();
     
@@ -58,7 +61,7 @@ fn main() {
             return;
         }
     };
-
+    
     let e_in = matches.value_of("extreme").unwrap_or("0");
     let mut extreme: usize = match e_in.parse() {
         Ok(n) => n,
@@ -67,7 +70,7 @@ fn main() {
             return;
         }
     };
-    if extreme > 1 {extreme = 0};
+    if extreme > 3 {extreme = 0};
     println!("Extreme setting set to: {}", extreme);
     
     let s_in = matches.value_of("slices").unwrap_or("9");
@@ -286,8 +289,8 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_framevec:Vec<f64>, filt_
             flipped_frame[i] = out_frame[i];
         }
     }
-    
-    let ness_window = make_ness_window(win_len, correlation.abs());
+    correlation = correlation.abs();
+    let ness_window = make_ness_window(win_len, correlation);
     let mut out_frame2 = vec![0.0; 3*win_len/2];
     for i in 0..(win_len/2) {
         out_frame2[i] = flipped_frame[i] * ness_window[i] + last_framevec[i + win_len/2] * ness_window[i + win_len/2];
@@ -296,6 +299,7 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_framevec:Vec<f64>, filt_
     for i in 0..win_len {
         out_frame2[i+win_len/2] = flipped_frame[i];
     }
+    out_frame2.push(correlation);
     return out_frame2;
 }
 
@@ -328,6 +332,7 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
     //all dependent on win_len ----
     
     for slice_num in 0..win_lens.len() {
+        let mut cut_offs2 = vec![vec![0.0;2];0];
         println!("channel {} slice layer: {} of {}", chan_num, slice_num, win_lens.len());
         let win_len = win_lens[slice_num];
         
@@ -358,71 +363,148 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
         let mut out_frame3 = vec![0.0; 3*win_len/2];
         
         for big_iter in 0..stretch_points.len() {
-                let mut real_planner = RealFftPlanner::<f64>::new();
-                let fft = real_planner.plan_fft_forward(win_len);
-                let mut spectrum = fft.make_output_vec();
-                let mut part = vec![0.0; win_len];
-                for i in 0..win_len {
-                    part[i] = indata[(stretch_points[big_iter] + i as i32) as usize] * in_win[i];
+            let mut real_planner = RealFftPlanner::<f64>::new();
+            let fft = real_planner.plan_fft_forward(win_len);
+            let mut spectrum = fft.make_output_vec();
+            let mut part = vec![0.0; win_len];
+            for i in 0..win_len {
+                part[i] = indata[(stretch_points[big_iter] + i as i32) as usize] * in_win[i];
+            }
+            fft.process(&mut part, &mut spectrum).unwrap();
+            if extreme<1 {
+                let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][4], 64.0);
+                
+                out_frame0 = process_microframe(spectrum, last_frame0.clone(), filt_win);
+                for i in 0..(win_len) {
+                    last_frame0[i] = out_frame0[i+win_len/2];
                 }
-                fft.process(&mut part, &mut spectrum).unwrap();
-                if extreme<1 {
-                    let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][4], 64.0);
-                    
-                    out_frame0 = process_microframe(spectrum, last_frame0.clone(), filt_win);
-                    for i in 0..(win_len) {
-                        last_frame0[i] = out_frame0[i+win_len/2];
-                    }
-                    for i in 0..(win_len/2) {
-                        outdata[out_points[big_iter] as usize + i] += (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i])/ win_len as f64; //you have to divide by the sqrt
-                    }
-                } else {
-                    thread::scope(|s| {
+                for i in 0..(win_len/2) {
+                    outdata[out_points[big_iter] as usize + i] += (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i])/ win_len as f64; //you have to divide by the sqrt
+                }
+            } else {
+                thread::scope(|s| {
                     let spectrum0 = spectrum.clone();
                     let spectrum1 = spectrum.clone();
                     let spectrum2 = spectrum.clone();
                     let spectrum3 = spectrum.clone();
+                    match extreme {
+                        1 => {
+                            for i in 0..4 {
+                                cut_offs2.push(vec![cut_offs[slice_num][i], cut_offs[slice_num][i+1]])
+                            }
+                        }, 
+                        2 => {
+                            for _i in 0..4 {
+                                cut_offs2.push(vec![cut_offs[slice_num][0], cut_offs[slice_num][4]])
+                            }
+                        },
+                        3 => {
+                            for i in 0..2 {
+                                cut_offs2.push(vec![cut_offs[slice_num][i*2], cut_offs[slice_num][i*2+2]]);
+                                cut_offs2.push(vec![cut_offs[slice_num][i*2], cut_offs[slice_num][i*2+2]]);
+                            }
+                        },
+                        _ => {
+                            std::process::exit(0x0100);
+                        }
+                    };
                     s.spawn(|_| {
-                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][1], 64.0);
-                        
+                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[0][0], cut_offs2[0][1], 64.0);
                         out_frame0 = process_microframe(spectrum0, last_frame0.clone(), filt_win);
+                        
+                    });
+                    s.spawn(|_| {
+                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[1][0], cut_offs2[1][1], 64.0);
+                        out_frame1 = process_microframe(spectrum1, last_frame1.clone(), filt_win);
+                        // for i in 0..(win_len) {
+                        //     last_frame1[i] = out_frame1[i+win_len/2];
+                        // }
+                    });
+                    s.spawn(|_| {
+                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[2][0], cut_offs2[2][1], 64.0);
+                        out_frame2 = process_microframe(spectrum2, last_frame2.clone(), filt_win);
+                        // for i in 0..(win_len) {
+                        //     last_frame2[i] = out_frame2[i+win_len/2];
+                        // }
+                    });
+                    s.spawn(|_| {
+                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[3][0], cut_offs2[3][1], 64.0);
+                        out_frame3 = process_microframe(spectrum3, last_frame3.clone(), filt_win);
+                        // for i in 0..(win_len) {
+                        //     last_frame3[i] = out_frame3[i+win_len/2];
+                        // }
+                    });
+                }).unwrap();
+                match extreme {
+                    1 => {
+                        for i in 0..(win_len/2) {
+                            outdata[out_points[big_iter] as usize + i] += (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i])/ win_len as f64; //you have to divide by the sqrt
+                        }
                         for i in 0..(win_len) {
                             last_frame0[i] = out_frame0[i+win_len/2];
                         }
-                    });
-                    s.spawn(|_| {
-                        let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][1], cut_offs[slice_num][2], 64.0);
-                        // let mut part = vec![0.0; win_len];
-                        // for i in 0..win_len {
-                            //     part[i] = indata[(stretch_points[big_iter] + i as i32) as usize] * in_win[i];
-                            // }
-                            //let mut spectrum1 = spectrum.clone();
-                            out_frame1 = process_microframe(spectrum1, last_frame1.clone(), filt_win);
-                            for i in 0..(win_len) {
-                                last_frame1[i] = out_frame1[i+win_len/2];
-                            }
-                        });
-                        s.spawn(|_| {
-                            let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][2], cut_offs[slice_num][3], 64.0);
-                            out_frame2 = process_microframe(spectrum2, last_frame2.clone(), filt_win);
-                            for i in 0..(win_len) {
-                                last_frame2[i] = out_frame2[i+win_len/2];
-                            }
-                        });
-                        s.spawn(|_| {
-                            let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][3], cut_offs[slice_num][4], 64.0);
-                            out_frame3 = process_microframe(spectrum3, last_frame3.clone(), filt_win);
-                            for i in 0..(win_len) {
-                                last_frame3[i] = out_frame3[i+win_len/2];
-                            }
-                        });
-                    }).unwrap();
-                    for i in 0..(win_len/2) {
-                        outdata[out_points[big_iter] as usize + i] += (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i])/ win_len as f64; //you have to divide by the sqrt
+                        for i in 0..(win_len) {
+                            last_frame1[i] = out_frame1[i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame2[i] = out_frame2[i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame3[i] = out_frame3[i+win_len/2];
+                        }
+                    },
+                    2 => {
+                        let out_frames = [&out_frame0, &out_frame1, &out_frame2, &out_frame3]; 
+                        let mut max = 2;
+                        for i2 in 1..out_frames.len() {
+                            if out_frames[i2][3*win_len/2]>out_frames[max][3*win_len/2] {max = i2};
+                        }
+                        //print!("{}",max);
+                        for i in 0..(win_len/2) {
+                            outdata[out_points[big_iter] as usize + i] += out_frames[max][i]/ win_len as f64; //you have to divide by the sqrt
+                        }
+                        for i in 0..(win_len) {
+                            last_frame0[i] = out_frames[max][i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame1[i] = out_frames[max][i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame2[i] = out_frames[max][i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame3[i] = out_frames[max][i+win_len/2];
+                        }
+                    },
+                    3 => {
+                        let out_frames = [&out_frame0, &out_frame1, &out_frame2, &out_frame3]; 
+                        let mut max = [0,0];
+                        if out_frames[0][3*win_len/2]>out_frames[1][3*win_len/2] {max[0] = 0} else {max[0] = 1};
+                        if out_frames[2][3*win_len/2]>out_frames[3][3*win_len/2] {max[1] = 2} else {max[1] = 3};
+                        for i in 0..(win_len/2) {
+                            outdata[out_points[big_iter] as usize + i] += (out_frames[max[0]][i]+out_frames[max[1]][i])/ win_len as f64; //you have to divide by the sqrt
+                        }
+                        for i in 0..(win_len) {
+                            last_frame0[i] = out_frames[max[0]][i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame1[i] = out_frames[max[0]][i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame2[i] = out_frames[max[1]][i+win_len/2];
+                        }
+                        for i in 0..(win_len) {
+                            last_frame3[i] = out_frames[max[1]][i+win_len/2];
+                        }
+                    },
+                    _ => {
+                        std::process::exit(0x0100);
                     }
                 }
-            };
-        }
+                
+            }
+        };
+    }
     return outdata;
 }
 
