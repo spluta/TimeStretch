@@ -20,7 +20,7 @@ The NessStretch is a refinement of [Paul Nasca](http://www.paulnasca.com/)'s exc
 
 ## Installation
 
-###Rust
+##Rust (compiled command line)
 
 For an optimized version of the NessStretch, use the command-line Rust version, which can be installed via homebrew (mac only), by running:
 
@@ -36,7 +36,7 @@ for the help.
 
 Or download the Rust source and compile using cargo.
 
-###Python
+##Python
 
 Requires numpy, scipy, and pandas. Using `virtualenv`:
 
@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
 See the Readme inside the python directory for further instructions.
 
-###SuperCollider
+##SuperCollider
 
 The SuperCollider version can be installed by running:
 
