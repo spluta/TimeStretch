@@ -30,7 +30,7 @@
 		var root = sampleRate/size;
 
 		if(freqs.size==0){freqs = [freqs]};
-		if(phases.size==0){phases = [phases]};
+		if(phases.size==0){phases = phases!freqs.size};
 		phases.postln;
 		realz = freqs.collect{|freq, i|
 			temp = freq/root;

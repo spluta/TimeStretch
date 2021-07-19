@@ -1,3 +1,7 @@
+//Rust NessStretch implementation
+//Release under a GPLv3 license
+//by Alex Ness and Sam Pluta
+
 use crossbeam_utils::thread;
 use clap::{App, Arg};
 use rand::Rng;
@@ -7,6 +11,8 @@ use std::f64::consts::PI;
 use std::time::SystemTime;
 
 fn main() {
+    //the main function
+    //the top uses the clap crate to create flags and help
     let matches = App::new("NessStretch")
     .version("0.1.0")
     .author("Sam Pluta and Alex Ness")
@@ -96,9 +102,14 @@ fn main() {
     println!("");
     println!("Will process up to a 10 channel audio file in parallel. Anything beyond 10 channels will result in a 10 channel file.");
     
+    //reading the sound file using hound
+    //only works with wav files - would be great to replace this with something that works with other formats
+
     let mut sound_file = hound::WavReader::open(file_name).unwrap();
     let mut intemp = vec![0.0; 0];
     
+    //loads the sound file into intemp
+    //checks to see the format of the sound file and converts all input (float, int16, int24, etc) to f64
     if sound_file.spec().sample_format == hound::SampleFormat::Float {
         intemp.append(
             &mut sound_file
@@ -119,13 +130,18 @@ fn main() {
         }
     };
     
+    //chunks the interleved file into chunks of size channels
+    //then transposes the interleaved file into individual vectors for each channel
     let chunked: Vec<Vec<f64>> = intemp
     .chunks(sound_file.spec().channels as usize)
     .map(|x| x.to_vec())
     .collect();
-    
     let channels = transpose(chunked);
     
+
+    //this is so ugly, but it is the only way I could figure out to make the parallel processing work
+    //basically creates individual vectors for each channel
+    //has to do this because a vector cannot be borrowed by a thread more than once, thus the multichannel vector has to be broken into individual vectors
     let channel0 = channels[0].clone();
     let mut channel1: Vec<f64> = vec![0.0; 0];
     let mut channel2: Vec<f64> = vec![0.0; 0];
@@ -147,6 +163,7 @@ fn main() {
     if channels.len()>8 {channel8 = channels[8].clone()};
     if channels.len()>9 {channel9 = channels[9].clone()};
     
+    //then creates output vectors for each channel as well
     let mut out_channels: Vec<Vec<f64>> =
     vec![vec![0.0_f64; 0]; sound_file.spec().channels as usize];
     
@@ -163,7 +180,8 @@ fn main() {
     
     let now = SystemTime::now();
     
-    
+    //creats an individual thread per input channel of the audio file
+    //only runs the thread if the number of channels exist
     thread::scope(|s| {
         
         s.spawn(|_| {
@@ -256,25 +274,28 @@ fn main() {
     println!("{:?}", now.elapsed());
 }
 
+//this is the code that does the actual randomizing of phases
 fn process_microframe (spectrum:Vec<Complex<f64>>, last_framevec:Vec<f64>, filt_win: Vec<f64>) -> Vec<f64> {
     let win_len = (spectrum.len()-1)*2;
     
+    //sets up the ifft planner
     let mut real_planner = RealFftPlanner::<f64>::new();
-    
     let ifft = real_planner.plan_fft_inverse(win_len);
     let mut out_frame = ifft.make_output_vec();
     let mut flipped_frame = vec![0.0; win_len];
-    
     let mut spectrum_out = real_planner.plan_fft_forward(win_len).make_output_vec();
     
+    //0s the bins and randomizes the phases
     for iter in 0..spectrum.len() {
         let mut temp = spectrum[iter].to_polar();
         temp.0 = temp.0 * filt_win[iter];
         temp.1 = rand::thread_rng().gen_range(-PI/2.0..PI/2.0);
         spectrum_out[iter] = Complex::from_polar(temp.0, temp.1);
     }
+    //performs the ifft
     ifft.process(&mut spectrum_out, &mut out_frame).unwrap();
     
+    //gets half the frame and checks correlation with the previous frame
     let half_vec0 = &last_framevec[win_len/2..];
     let half_vec1 = &out_frame[..win_len/2];
     
@@ -286,6 +307,7 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_framevec:Vec<f64>, filt_
         correlation = r/s;
     }
     
+    //inverts the randomized signal if the correlation is negative
     for i in 0..win_len {
         if correlation<0.0 {
             flipped_frame[i] = -1.0*out_frame[i];
@@ -295,7 +317,11 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_framevec:Vec<f64>, filt_
     }
     correlation = correlation.abs();
     let ness_window = make_ness_window(win_len, correlation);
+
+    //returns a frame that contains the frame multiplied by the ness_window, the flipped frame (necessary for checking the next correlation), and then the value of the correlation (which is used in extreme algorithms 2 and 3) 
     let mut out_frame2 = vec![0.0; 3*win_len/2];
+
+    //multiples the ness_window by the frame
     for i in 0..(win_len/2) {
         out_frame2[i] = flipped_frame[i] * ness_window[i] + last_framevec[i + win_len/2] * ness_window[i + win_len/2];
         
@@ -309,10 +335,15 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_framevec:Vec<f64>, filt_
 
 //,  sc: &crossbeam_utils::thread::Scope<'_>
 fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, extreme: usize) -> Vec<f64> {    
-    let mut win_lens = vec![0_usize; 0];
+    //process an individual channel
     
+    let max_win_size = 65536;
+    let mut win_lens = vec![0_usize; 0];  
+    
+    //creates a vector of fft cutoff bins based on the number of spectral slices
+    //in the standard version this is [1, 128], [64, 128], [64, 128]...[64,128]
+    //the extreme versions can split those cuttoffs into 2 and 4 more subslices
     let mut cut_offs = vec![vec![0.0_f64; 0]; num_slices];
-    
     for iter in 0..num_slices {
         let size = i32::pow(2,iter as u32 + 8);
         win_lens.push(size as usize);
@@ -324,28 +355,28 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
         cut_offs[iter] = cutty;
     }
     
-    let mut indata = vec![0.0_f64; 65536];
+    let mut indata = vec![0.0_f64; max_win_size]; //0 pads the front of the channel with a max_frame of 0s
+    let in_size = channel.len() + max_win_size;  
     
-    let in_size = channel.len() + 65536;
+    indata.append(&mut channel); //adds the channel data to indata
     
-    indata.append(&mut channel);
+    indata.append(&mut vec![0.0_f64; 2 * max_win_size - (indata.len() % max_win_size)]);  //adds 0s at the end of indata so that the vector size is divisible by max_win_size
     
-    indata.append(&mut vec![0.0_f64; 2 * 65536 - (indata.len() % 65536)]);
+    //creates the outdata vector as a indata*dur_mul plus an extra window for the last frame
+    let mut outdata = vec![0.0_f64; (in_size as f64 * dur_mult + max_win_size as f64) as usize];
     
-    let mut outdata = vec![0.0_f64; (in_size as f64 * dur_mult + 65536.0) as usize];
-    //all dependent on win_len ----
-    
+    //iterates over the vector of window lengths - in other words, the spectral slices
     for slice_num in 0..win_lens.len() {
         let mut cut_offs2 = vec![vec![0.0;2];0];
         println!("channel {} slice layer: {} of {}", chan_num, slice_num, win_lens.len());
         let win_len = win_lens[slice_num];
         
-        let in_win = make_paul_window(win_len);
+        let in_win = make_paul_window(win_len);  //uses a paul window on the input
         
         let hop = (win_len as f64 / 2.0) / dur_mult;
         
+        //creates a vector of stretch points along the input file
         let mut stretch_points = vec![0; (in_size as f64 / hop) as usize];
-        
         for iter in 0..stretch_points.len() {
             stretch_points[iter] = (hop * iter as f64) as i32 + (32768 - win_len / 2) as i32;
         }
@@ -356,6 +387,8 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
             out_points[iter] = (iter * win_len / 2)+ (32768 - win_len / 2);
         }
         
+        //again, really ugly, but necessary for the parallel processing in the extreme versions of the algorithm
+        //makes 4 different vectors - 1 for each of the 4 micro-slices of the spectral slice
         let mut last_frame0 = vec![0.0; win_len];
         let mut last_frame1 = vec![0.0; win_len];
         let mut last_frame2 = vec![0.0; win_len];
@@ -366,7 +399,10 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
         let mut out_frame2 = vec![0.0; 3*win_len/2];
         let mut out_frame3 = vec![0.0; 3*win_len/2];
         
+        //big loop over the stretch points
         for big_iter in 0..stretch_points.len() {
+
+            //for efficiency, does the fft once for the 1-4 micro-slices of the algorithm
             let mut real_planner = RealFftPlanner::<f64>::new();
             let fft = real_planner.plan_fft_forward(win_len);
             let mut spectrum = fft.make_output_vec();
@@ -375,9 +411,12 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
                 part[i] = indata[(stretch_points[big_iter] + i as i32) as usize] * in_win[i];
             }
             fft.process(&mut part, &mut spectrum).unwrap();
+
+            //either does 1 or 4 slices of the spectrum
             if extreme<1 {
                 let filt_win = make_lr_bp_window(win_len/2+1, cut_offs[slice_num][0], cut_offs[slice_num][4], 64.0);
                 
+                //process_microframe does the actual processing of the phase and returns the phase randomized frame
                 out_frame0 = process_microframe(spectrum, last_frame0.clone(), filt_win);
                 for i in 0..(win_len) {
                     last_frame0[i] = out_frame0[i+win_len/2];
@@ -387,10 +426,12 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
                 }
             } else {
                 thread::scope(|s| {
+                    //in the four layer version, we need to clone the spectrum so that it can be used by the 4 parallel streams
                     let spectrum0 = spectrum.clone();
                     let spectrum1 = spectrum.clone();
                     let spectrum2 = spectrum.clone();
                     let spectrum3 = spectrum.clone();
+                    //creates the cutoffs vector based on the extreme stretching algorithm
                     match extreme {
                         1 => {
                             for i in 0..4 {
@@ -412,6 +453,8 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
                             std::process::exit(0x0100);
                         }
                     };
+                    //the four different threads of the different extreme algorithms
+                    //each one runs in parallel in its own thread - I wonder if this is actually more efficient
                     s.spawn(|_| {
                         let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[0][0], cut_offs2[0][1], 64.0);
                         out_frame0 = process_microframe(spectrum0, last_frame0.clone(), filt_win);
@@ -420,25 +463,18 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
                     s.spawn(|_| {
                         let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[1][0], cut_offs2[1][1], 64.0);
                         out_frame1 = process_microframe(spectrum1, last_frame1.clone(), filt_win);
-                        // for i in 0..(win_len) {
-                        //     last_frame1[i] = out_frame1[i+win_len/2];
-                        // }
                     });
                     s.spawn(|_| {
                         let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[2][0], cut_offs2[2][1], 64.0);
                         out_frame2 = process_microframe(spectrum2, last_frame2.clone(), filt_win);
-                        // for i in 0..(win_len) {
-                        //     last_frame2[i] = out_frame2[i+win_len/2];
-                        // }
                     });
                     s.spawn(|_| {
                         let filt_win = make_lr_bp_window(win_len/2+1, cut_offs2[3][0], cut_offs2[3][1], 64.0);
                         out_frame3 = process_microframe(spectrum3, last_frame3.clone(), filt_win);
-                        // for i in 0..(win_len) {
-                        //     last_frame3[i] = out_frame3[i+win_len/2];
-                        // }
                     });
                 }).unwrap();
+
+                //grabs the last frame to do the correlation with the next frame
                 match extreme {
                     1 => {
                         for i in 0..(win_len/2) {
@@ -512,6 +548,8 @@ fn process_channel (chan_num: usize, mut channel: Vec<f64>, num_slices: usize, d
     return outdata;
 }
 
+//the output of the audio will have insane values because of the nature of the rust fft
+//this normalizes the output to 0db
 fn normalize (mut chans: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
     let mut max = 0.0;
     let chans_iter = chans.iter();
@@ -528,8 +566,8 @@ fn normalize (mut chans: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
     return chans;
 }
 
+//makes the ness window in accordance with the correlation number provided
 fn make_ness_window(mut len: usize, correlation: f64) -> Vec<f64> {
-    
     let mut floats: Vec<f64> = vec![0.0; len];
     let mut vals: Vec<f64> = vec![0.0; len];
     len = len-1;
@@ -544,6 +582,8 @@ fn make_ness_window(mut len: usize, correlation: f64) -> Vec<f64> {
     return vals
 }
 
+//makes the linkwitz-riley fft crossfade window, which effectively 0s out the bins wanted in the spectral slice
+//high pass, low pass, and bandbass versions
 fn make_lr_lp_window(len: usize, hi_bin: f64, order: f64)-> Vec<f64> {
     let mut filter = vec![1.0; len];
     if hi_bin!=0.0 {
@@ -580,6 +620,7 @@ fn make_lr_bp_window(len: usize, low_bin: f64, hi_bin: f64, order: f64) -> Vec<f
     return filter
 }
 
+//the paul stretch window is used on input - might a well be a sine or hann window
 fn make_paul_window(len: usize) -> Vec<f64> {
     let mut part = vec![0.0; len];
     for i in 0..len {
@@ -590,6 +631,7 @@ fn make_paul_window(len: usize) -> Vec<f64> {
     return part;
 }
 
+//flops a channel array from interleaved clusters to separate files
 fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>>
 where
 T: Clone,

@@ -1,0 +1,9 @@
+/Users/spluta1/Library/Application Support/SuperCollider/Extensions/TimeStretch/rust/target/x86_64-unknown-linux-gnu/release/deps/encoding_index_japanese-1c7c484ae69abc1a.rmeta: /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/lib.rs /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0208.rs /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0212.rs
+
+/Users/spluta1/Library/Application Support/SuperCollider/Extensions/TimeStretch/rust/target/x86_64-unknown-linux-gnu/release/deps/libencoding_index_japanese-1c7c484ae69abc1a.rlib: /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/lib.rs /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0208.rs /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0212.rs
+
+/Users/spluta1/Library/Application Support/SuperCollider/Extensions/TimeStretch/rust/target/x86_64-unknown-linux-gnu/release/deps/encoding_index_japanese-1c7c484ae69abc1a.d: /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/lib.rs /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0208.rs /Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0212.rs
+
+/Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/lib.rs:
+/Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0208.rs:
+/Users/spluta1/.cargo/registry/src/github.com-1ecc6299db9ec823/encoding-index-japanese-1.20141219.5/jis0212.rs:
