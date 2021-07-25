@@ -112,16 +112,12 @@ class AnalysisBand(object):
             mix = ifft * self.synthesis_window_array
             mix_bus[int(current_output_time) : int(current_output_time) + self.nfft] += mix
 
-    def stretch(self, input_signal, playback_rate, channel, mix_bus, sample_rate, fixed_length):
+    def stretch(self, input_signal, playback_rate, channel, mix_bus, sample_rate):
         if self.phase_mode in ('randomize', 'interpolate'):
             padded_input_signal = np.concatenate([np.zeros(self.nfft//2), input_signal, np.zeros(self.nfft//2)])
         else: # self.phase_mode == 'keep'
             padded_input_signal = np.concatenate([input_signal, np.zeros(self.nfft)])
-        total_length = len(padded_input_signal) - self.nfft
-        if fixed_length > 0:
-            input_end_time = min(sample_rate * playback_rate * fixed_length, total_length)
-        else:
-            input_end_time = total_length
+        input_end_time = len(padded_input_signal) - self.nfft
         current_input_time = 0
         current_output_time = 0
         num_frames = 0
@@ -141,7 +137,7 @@ class AnalysisBand(object):
                 log.debug(f'Number of negative frame correlations: {self.r_inverted}')
                 log.debug(f'Average frame correlation with phase correction r_av_abs = {self.r_sum_abs / num_frames}')
 
-def fancy_stretch(temp_dir, input_signal, playback_rate, channel, preset, input_sample_rate, fixed_length):
+def fancy_stretch(temp_dir, input_signal, playback_rate, channel, preset, input_sample_rate):
     max_nfft = max(preset.nfft)
     target_length = np.ceil(len(input_signal) / playback_rate) + max_nfft
     mix_bus_path = join(temp_dir, f'channel-{channel}.dat')
@@ -153,8 +149,7 @@ def fancy_stretch(temp_dir, input_signal, playback_rate, channel, preset, input_
                   f'synthesis_window={band_preset.synthesis_window}, '
                   f'phase_mode={band_preset.phase_mode}, '
                   f'nonnegative_phases={band_preset.nonnegative_phases}, '
-                  f'overlap={band_preset.overlap}, '
-                  f'fixed_length={fixed_length}')
+                  f'overlap={band_preset.overlap}')
         band = AnalysisBand(
             band_preset.nfft,
             band_preset.low_bin,
@@ -168,6 +163,5 @@ def fancy_stretch(temp_dir, input_signal, playback_rate, channel, preset, input_
             playback_rate,
             channel,
             mix_bus,
-            input_sample_rate,
-            fixed_length)
+            input_sample_rate)
     return mix_bus
