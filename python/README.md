@@ -59,4 +59,4 @@ Stretch an input file to 5/4 the original length (4/5 playback speed):
 
 ## Documentation
 
-See the [Jupyter notebook](https://github.com/asness/TimeStretch/blob/master/python/NessStretch%20documentation.ipynb).
+For more information about the algorithm, see the [ICMC 2021 paper](https://github.com/asness/TimeStretch/blob/master/python/NessStretchICMC_Final.pdf).
