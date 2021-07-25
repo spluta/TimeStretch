@@ -20,7 +20,6 @@ from tempfile import TemporaryDirectory
 DEFAULT_RATE = '0.125'
 DEFAULT_PRESET_CSV = 'presets.csv'
 DEFAULT_PRESET = 'katy_perry'
-DEFAULT_FIXED_LENGTH = 0
 
 def norm_factor(signal, reference_signal):
     max_ref = np.max(reference_signal)
@@ -28,7 +27,7 @@ def norm_factor(signal, reference_signal):
     factor = max_ref / max_sig
     return factor
 
-def render(infile, outfile, rate, preset_file, preset_name, fixed_length):
+def render(infile, outfile, rate, preset_file, preset_name):
     log.debug(f'Loading preset "{preset_name}" from file "{preset_file}"')
     all_presets = pd.read_csv(preset_file, comment='#')
     preset = all_presets[all_presets['preset'] == preset_name]
@@ -54,7 +53,7 @@ def render(infile, outfile, rate, preset_file, preset_name, fixed_length):
         for channel in range(n_channels):
             log.info(f'Processing channel {channel+1}')
             input_channel = normalized_input_data[:, channel]
-            channel_stretch = fancy_stretch(temp_dir, input_channel, rate_val, channel, preset, input_sample_rate, fixed_length)
+            channel_stretch = fancy_stretch(temp_dir, input_channel, rate_val, channel, preset, input_sample_rate)
             output.append(channel_stretch)
         log.info('Normalizing audio')
         factor = norm_factor(output, normalized_input_data)
@@ -98,11 +97,6 @@ if __name__ == '__main__':
         '-l', '--log',
         action='store_true',
         help=f'write logging messages to a file, default is False')
-    parser.add_argument(
-        '-F', '--fixed-length',
-        default=DEFAULT_FIXED_LENGTH,
-        type=float,
-        help=f'if positive, length of output file in seconds, default is {DEFAULT_FIXED_LENGTH} (ignored)')
     args = parser.parse_args()
     if args.verbose:
         log_level=log.DEBUG
@@ -114,4 +108,4 @@ if __name__ == '__main__':
         log.basicConfig(filename=log_filename, level=log_level, format='%(asctime)s %(message)s')
     else:
         log.basicConfig(level=log_level, format='%(asctime)s %(message)s')
-    render(args.infile, args.outfile, args.rate, args.preset_file, args.preset, args.fixed_length)
+    render(args.infile, args.outfile, args.rate, args.preset_file, args.preset)
