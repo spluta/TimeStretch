@@ -14,6 +14,8 @@ import numpy as np
 import scipy.signal
 import sys
 
+MAX_NFFT = 131072
+
 def p2r(radii, angles):
     '''Complex polar to rectangular'''
     return radii * np.exp(1j*angles)
@@ -138,8 +140,7 @@ class AnalysisBand(object):
                 log.debug(f'Average frame correlation with phase correction r_av_abs = {self.r_sum_abs / num_frames}')
 
 def fancy_stretch(temp_dir, input_signal, playback_rate, channel, preset, input_sample_rate):
-    max_nfft = max(preset.nfft)
-    target_length = np.ceil(len(input_signal) / playback_rate) + max_nfft
+    target_length = np.ceil(len(input_signal) / playback_rate) + MAX_NFFT
     mix_bus_path = join(temp_dir, f'channel-{channel}.dat')
     mix_bus = np.memmap(mix_bus_path, dtype='float32', mode='w+', shape=int(target_length))
     for index, band_preset in preset.iterrows():
