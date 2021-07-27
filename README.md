@@ -18,6 +18,8 @@ Implements a phase randomized FFT (SC) or STFT (Python) time stretch algorithm, 
 
 The NessStretch is a refinement of [Paul Nasca](http://www.paulnasca.com/)'s excellent [PaulStretch](http://hypermammut.sourceforge.net/paulstretch/) algorithm.  PaulStretch uses a single frame size throughout the entire frequency range.  The NessStretch's layered analysis bands are a better match for human frequency perception, and do a better job of resolving shorter, noisier high-frequency sounds (sibilance, snares, etc.).
 
+See the ICMC paper in this folder for more details.
+
 ## Installation
 
 ## Rust
