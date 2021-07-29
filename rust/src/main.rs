@@ -17,7 +17,7 @@ fn main() {
     //the main function
     //the top uses the clap crate to create flags and help
     let matches = App::new("NessStretch")
-    .version("0.1.0")
+    .version("0.3.0")
     .author("Sam Pluta and Alex Ness")
     .about("NessStretch Time Stretching Algorithm")
     .arg(
@@ -32,7 +32,7 @@ fn main() {
         .short("m")
         .long("dur_mult")
         .takes_value(true)
-        .help("The duration multiplier"),
+        .help("The duration multiplier. eg: 100 is a 100x stretch"),
     ).arg(
         Arg::with_name("out")
         .short("o")
@@ -52,10 +52,10 @@ fn main() {
         .short("e")
         .long("extreme")
         .takes_value(true)
-        .help("In addition to the standard NessStretch (default 0), there are 3 extreme modes (more cpu) set by this flag. 
+        .help("In addition to the standard NessStretch (default 0), there are 3+ extreme modes (more cpu) set by this flag. 
         1 - makes 10 versions of each frame and chooses the one that best correlates with the previous frame
-        2 - breaks the (9) slices spectral slices into 4 more slices, and correlates those independently
-        3 - both 1 and 2, with 3 versions of each frame and 2 extra slices
+        2 - breaks the (9) spectral slices into 4 more slices, and correlates those independently
+        3 - both 1 and 2, with the spectra split into 2 extra slices and 3 versions of each frame compared for correlation
         4+ - like extreme 1, except the number assigned is the number of versions of each frame made (-e 5 makes 5 versions of each frame)"
     ))
     .get_matches();
@@ -143,8 +143,8 @@ fn main() {
     let channels = transpose(chunked);
     
     //then creates output vectors for each channel as well
-    let mut out_channels: Vec<Vec<f64>> =
-    vec![vec![0.0_f64; 0]; sound_file.spec().channels as usize];
+    let mut out_channels: Vec<Vec<f32>> =
+    vec![vec![0.0_f32; 0]; sound_file.spec().channels as usize];
     
     let now = SystemTime::now();
     
@@ -268,7 +268,7 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_frame:&[f64], filt_win: 
 }
 
 //,  sc: &crossbeam_utils::thread::Scope<'_>
-fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, extreme: usize) -> Vec<f64> {    
+fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, extreme: usize) -> Vec<f32> {    
     //process an individual channel
     
     
@@ -301,7 +301,7 @@ fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, ext
     indata.append(&mut vec![0.0_f64; 2 * MAX_WIN_SIZE - (indata.len() % MAX_WIN_SIZE)]);  //adds 0s at the end of indata so that the vector size is divisible by MAX_WIN_SIZE
     
     //creates the outdata vector as a indata*dur_mul plus an extra window for the last frame
-    let mut out_data = vec![0.0_f64; (in_size as f64 * dur_mult + MAX_WIN_SIZE as f64) as usize];
+    let mut out_data = vec![0.0_f32; (in_size as f64 * dur_mult + MAX_WIN_SIZE as f64) as usize];
     
     //set the hop size to calculate the chunks of audio to be processed
     //let chunk_size = MAX_WIN_SIZE * 100;
@@ -415,7 +415,7 @@ fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, ext
         
         for i in 0..MAX_WIN_SIZE {
             
-            out_data[write_point+i] = out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i]+out_frame4[i]+out_frame5[i]+out_frame6[i]+out_frame7[i]+out_frame8[i];
+            out_data[write_point+i] = (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i]+out_frame4[i]+out_frame5[i]+out_frame6[i]+out_frame7[i]+out_frame8[i]) as f32;
         }
         };
         
@@ -510,7 +510,7 @@ fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, ext
     
     //the output of the audio will have insane values because of the nature of the rust fft
     //this normalizes the output to 0db
-    fn normalize (mut chans: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn normalize (mut chans: Vec<Vec<f32>>) -> Vec<Vec<f32>> {
         let mut max = 0.0;
         let chans_iter = chans.iter();
         for chan in chans_iter{
