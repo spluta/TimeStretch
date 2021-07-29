@@ -17,7 +17,7 @@ fn main() {
     //the main function
     //the top uses the clap crate to create flags and help
     let matches = App::new("NessStretch")
-    .version("0.3.0")
+    .version("0.3.1")
     .author("Sam Pluta and Alex Ness")
     .about("NessStretch Time Stretching Algorithm")
     .arg(
