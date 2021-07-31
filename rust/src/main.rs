@@ -77,14 +77,14 @@ fn main() {
     };
     
     let e_in = matches.value_of("extreme").unwrap_or("0");
-    let mut extreme: usize = match e_in.parse() {
+    let extreme: usize = match e_in.parse() {
         Ok(n) => n,
         Err(_) => {
             eprintln!("error: extreme argument not an integer");
             return;
         }
     };
-    if extreme > 3 {extreme = 0};
+   
     println!("Extreme setting set to: {}", extreme);
     
     let s_in = matches.value_of("slices").unwrap_or("9");
@@ -143,8 +143,8 @@ fn main() {
     let channels = transpose(chunked);
     
     //then creates output vectors for each channel as well
-    let mut out_channels: Vec<Vec<f32>> =
-    vec![vec![0.0_f32; 0]; sound_file.spec().channels as usize];
+    let mut out_channels: Vec<Vec<f64>> =
+    vec![vec![0.0_f64; 0]; sound_file.spec().channels as usize];
     
     let now = SystemTime::now();
     
@@ -268,7 +268,7 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_frame:&[f64], filt_win: 
 }
 
 //,  sc: &crossbeam_utils::thread::Scope<'_>
-fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, extreme: usize) -> Vec<f32> {    
+fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, extreme: usize) -> Vec<f64> {    
     //process an individual channel
     
     
@@ -301,7 +301,7 @@ fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, ext
     indata.append(&mut vec![0.0_f64; 2 * MAX_WIN_SIZE - (indata.len() % MAX_WIN_SIZE)]);  //adds 0s at the end of indata so that the vector size is divisible by MAX_WIN_SIZE
     
     //creates the outdata vector as a indata*dur_mul plus an extra window for the last frame
-    let mut out_data = vec![0.0_f32; (in_size as f64 * dur_mult + MAX_WIN_SIZE as f64) as usize];
+    let mut out_data = vec![0.0_f64; (in_size as f64 * dur_mult + MAX_WIN_SIZE as f64) as usize];
     
     //set the hop size to calculate the chunks of audio to be processed
     //let chunk_size = MAX_WIN_SIZE * 100;
@@ -414,8 +414,7 @@ fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, ext
         write_point = iter*MAX_WIN_SIZE;
         
         for i in 0..MAX_WIN_SIZE {
-            
-            out_data[write_point+i] = (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i]+out_frame4[i]+out_frame5[i]+out_frame6[i]+out_frame7[i]+out_frame8[i]) as f32;
+            out_data[write_point+i] = (out_frame0[i]+out_frame1[i]+out_frame2[i]+out_frame3[i]+out_frame4[i]+out_frame5[i]+out_frame6[i]+out_frame7[i]+out_frame8[i]) as f64;
         }
         };
         
@@ -510,7 +509,7 @@ fn process_channel (mut channel: Vec<f64>, num_slices: usize, dur_mult: f64, ext
     
     //the output of the audio will have insane values because of the nature of the rust fft
     //this normalizes the output to 0db
-    fn normalize (mut chans: Vec<Vec<f32>>) -> Vec<Vec<f32>> {
+    fn normalize (mut chans: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let mut max = 0.0;
         let chans_iter = chans.iter();
         for chan in chans_iter{
