@@ -32,7 +32,7 @@ fn main() {
         .short("m")
         .long("dur_mult")
         .takes_value(true)
-        .help("The duration multiplier. eg: 100 is a 100x stretch"),
+        .help("The duration multiplier. eg: 100 is a 100x stretch. dur_mults under 1 might work...and they might not"),
     ).arg(
         Arg::with_name("out")
         .short("o")
@@ -136,8 +136,8 @@ fn main() {
         }
     };
     
+    //if the sample rate is 88.2K or above, the largest window will be 131072, otherwise 65536
     let mut sr_mult = 1;
-    
     let sample_rate = sound_file.spec().sample_rate;
 
     if sample_rate>=88200{
@@ -145,9 +145,11 @@ fn main() {
     } else if sample_rate>=176400{
         sr_mult = 4;
     }
-    
     let max_win_size:usize = 65536*sr_mult;
-    let out_frame_size:usize = max_win_size*3;
+
+    //this is the size the frames that are calculated by process_chunk == 
+    //[processed audio(max_win_size)][last_frame1][last_frame2][last_frame3][last_frame4] (for the 4 possible subslices of the slice)
+    let out_frame_size:usize = max_win_size*3;  
     
     println!("Max Window Size: {}", max_win_size);
     
@@ -168,7 +170,7 @@ fn main() {
     let mut hops = vec![0_f64; 0];  
     
     
-    //the window lengths will double for sample rates at 88k and 96k and quadruple for sr's double that
+    //the higher sample rates can have 10 slices
     if sample_rate<88200 && num_slices>9 {
         num_slices = MAX_SLICES-1;
     } else if sample_rate>=88200 && num_slices>9 {
@@ -176,6 +178,8 @@ fn main() {
     }
     println!("The audio file will be sliced into {} slices", num_slices);
 
+    //pushes the win_lens into the vector
+    //256 is always the smallest win_lens, 131072 always the largest (the extras just don't get used)
     for iter in 0..MAX_SLICES {
         let size = u32::pow(2, 8+iter as u32);
         win_lens.push(size as usize);
@@ -183,7 +187,6 @@ fn main() {
     }
 
     //creates a vector of fft cutoff bins based on the number of spectral slices
-    //in the standard version this is [1, 128], [64, 128], [64, 128]...[64,128]
     //the extreme versions can split those cuttoffs into 2 and 4 more subslices
     let cut_max = max_win_size as f64/512.0;
     let mut cut_offs = vec![vec![0.0_f64; 0]; num_slices];
@@ -206,9 +209,12 @@ fn main() {
     let mut indata = vec![vec![0.0_f64; max_win_size]; num_channels]; //0 pads the front of the channel with a max_frame of 0s
     let in_size = max_win_size+channels[0].len();
     
+    let frames_to_add = 2 * max_win_size - (in_size % max_win_size);
+    //println!("framestoadd {}", frames_to_add);
     for i in 0..num_channels {
         indata[i].append(&mut channels[i]); //adds the channel data to indata
-        indata[i].append(&mut vec![0.0_f64; 2 * max_win_size - (in_size % max_win_size)]);  //adds 0s at the end of indata so that the vector size is divisible by max_win_size
+        indata[i].append(&mut vec![0.0_f64; frames_to_add]);  //adds 0s at the end of indata so that the vector size is divisible by max_win_size
+        // println!("indatasize {}", indata[i].len());
     }
     
     //creates the outdata vector as a indata*dur_mul plus an extra window for the last frame
@@ -220,6 +226,13 @@ fn main() {
     let mut chunk_points = vec![0; (in_size as f64 / max_win_size as f64*dur_mult) as usize];
     for iter in 0..chunk_points.len() {
         chunk_points[iter] = ((iter*max_win_size) as f64 /dur_mult) as usize;
+    }
+
+    while chunk_points.len()<4 {
+        chunk_points.push(((chunk_points.len()*max_win_size) as f64 /dur_mult) as usize);
+        for i in 0..num_channels {
+            indata[i].append(&mut vec![0.0_f64; max_win_size]);
+        }
     }
     
     //again, really ugly, but necessary for the parallel processing in the extreme versions of the algorithm
