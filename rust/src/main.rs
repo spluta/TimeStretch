@@ -45,8 +45,9 @@ fn main() {
         .short("s")
         .long("num_slices")
         .takes_value(true)
-        .help("The number of slices of the spectrum (optional - default is 9 - 4 is nice for transients/perc).
-        For a file of 88.2K or over, the slice number can be 10"),
+        .help("The number of slices of the spectrum (optional - default is 9 - 4 or 5 is nice for transients/perc).
+        For below 88.2K, the max slice number is 9.
+        For a file of 88.2K or over, the max slice number is 10."),
     )
     .arg(
         Arg::with_name("extreme")
@@ -268,7 +269,7 @@ fn main() {
     let mut writer = hound::WavWriter::create(out_file, spec).unwrap();
     
     for iter in 0..chunk_points.len() {
-        if iter%100 == 0 {println!("chunk {} of {}", iter+1, chunk_points.len())}
+        if iter%25 == 0 {println!("chunk {} of {}", iter, chunk_points.len())}
 
         let chunk_point = chunk_points[iter];
         
