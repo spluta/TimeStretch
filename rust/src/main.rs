@@ -237,6 +237,10 @@ fn main() {
     }
     
     //again, really ugly, but necessary for the parallel processing in the extreme versions of the algorithm
+    //the way to fix this would be to create arrays instead of vectors, 
+    //but since arrays need consts as sizes, the data blocks would all have to be 131072 samples and there would have to be a hard channel limit
+    //but then
+
     //makes 4 different vectors - 1 for each of the 4 micro-slices of the spectral slice
     let mut last_frame0 = vec![0.0; win_lens[0]*2*num_channels];
     let mut last_frame1 = vec![0.0; win_lens[1]*2*num_channels];
