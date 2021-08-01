@@ -2,4 +2,4 @@
 *.wav
 *.aif
 *.caf
-rust/target/
+/rust/target/*
