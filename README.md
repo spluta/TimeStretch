@@ -18,13 +18,15 @@ Implements a phase randomized Real FFT time stretch algorithm, the NessStretch, 
 
 The NessStretch is a refinement of [Paul Nasca](http://www.paulnasca.com/)'s excellent [PaulStretch](http://hypermammut.sourceforge.net/paulstretch/) algorithm.  PaulStretch uses a single frame size throughout the entire frequency range.  The NessStretch's layered analysis bands are a better match for human frequency perception, and do a better job of resolving shorter, noisier high-frequency sounds (sibilance, snares, etc.).
 
-See the ICMC paper in this folder for more details.
+See the [ICMC paper](https://github.com/spluta/TimeStretch/blob/main/NessStretchICMC_Final.pdf) for more details. Or just run it and give it a listen.
 
 ## Installation
 
 ## Rust
 
-For an optimized version of the NessStretch, use the command-line Rust version, which can be installed via homebrew (mac only), by running:
+For an optimized version of the NessStretch, use the command-line Rust version, which can be installed in a couple of different ways:
+
+1) via homebrew (mac only), by running:
 
 ```
 brew tap spluta/ness_stretch
@@ -35,6 +37,12 @@ then
 ness_stretch -h
 ```
 for the help.
+
+2) Rust cargo users can install with cargo:
+
+```
+cargo install ness_stretch
+```
 
 Linux and Windows builds (untested auto builds using GitHub actions) are found here:
 
