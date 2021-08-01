@@ -1,1 +1,0 @@
-/Users/spluta1/Library/Application\ Support/SuperCollider/Extensions/TimeStretch/rust/target/release/ness_stretch: /Users/spluta1/Library/Application\ Support/SuperCollider/Extensions/TimeStretch/rust/src/main.rs no_atomic.rs
