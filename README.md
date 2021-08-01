@@ -36,6 +36,10 @@ ness_stretch -h
 ```
 for the help.
 
+Linux and Windows builds (untested auto builds using GitHub actions) are found here:
+
+https://github.com/spluta/ness_stretch/actions/runs/1087257841
+
 Or download the Rust source and compile using cargo. The rust version will be very fast on Intel Macs and very slow on Arm machines (until rustfft gets updated).
 
 ## Python
