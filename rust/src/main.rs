@@ -228,6 +228,7 @@ fn main() {
         chunk_points[iter] = ((iter*max_win_size) as f64 /dur_mult) as usize;
     }
 
+    //this is to compensate if the chunk_points is for some reason less than 4 - which causes issues with the outfile
     while chunk_points.len()<4 {
         chunk_points.push(((chunk_points.len()*max_win_size) as f64 /dur_mult) as usize);
         for i in 0..num_channels {
@@ -248,6 +249,8 @@ fn main() {
     let mut last_frame8 = vec![0.0; win_lens[8]*2*num_channels];
     let mut last_frame9 = vec![0.0; win_lens[9]*2*num_channels];
     
+    //used for the output of process_chunk
+    //holds the 1)full output chunk 2)four last_frames for extreme stretch
     let mut out_temp0 = vec![0.0; out_frame_size];
     let mut out_temp1 = vec![0.0; out_frame_size];
     let mut out_temp2 = vec![0.0; out_frame_size];
@@ -259,6 +262,7 @@ fn main() {
     let mut out_temp8 = vec![0.0; out_frame_size];
     let mut out_temp9 = vec![0.0; out_frame_size];
     
+    //holds
     let mut out_frame0 = vec![0.0; out_frame_size*num_channels];
     let mut out_frame1 = vec![0.0; out_frame_size*num_channels];
     let mut out_frame2 = vec![0.0; out_frame_size*num_channels];
@@ -270,8 +274,8 @@ fn main() {
     let mut out_frame8 = vec![0.0; out_frame_size*num_channels];
     let mut out_frame9 = vec![0.0; out_frame_size*num_channels];
     
-    //let mut write_point;
     
+    //hound is the wav reader and writer
     let spec = hound::WavSpec {
         channels: num_channels as u16,
         sample_rate: sample_rate,
@@ -281,19 +285,26 @@ fn main() {
     
     let mut writer = hound::WavWriter::create(out_file, spec).unwrap();
     
+    //go through the chunk_points, making max_win_size chunks of audio
     for iter in 0..chunk_points.len() {
         if iter%25 == 0 {println!("chunk {} of {}", iter, chunk_points.len())}
 
         let chunk_point = chunk_points[iter];
         
+        //super ugly, but as far as I know, this is the only way to access a multidimensional vector
         thread::scope(|s| {
             s.spawn(|_| {
                 for chan_num in 0..num_channels {
+                    //out_temp will be the chunk of audio to write, then 4 "last_frames", one for each of the possible subslices
                     out_temp0 = process_chunk(&indata[chan_num], chunk_point, win_lens[0], hops[0], cut_offs[0].clone(), last_frame0.clone(), chan_num, extreme, max_win_size, out_frame_size);
                     
+                    //put the last_frame data back into the last frame so it is there when we loop around to the next chunk
                     for i in 0..(win_lens[0]*2) {
                         last_frame0[chan_num*win_lens[0]*2+i] = out_temp0[max_win_size+i];
                     }
+                    //grab the out_frame from the out_temp
+                    //the out_frame is a flat array with spaces for all channels of output audio
+                    //it is stored [channel0][channel1]..etc, but is flat
                     for i in 0..max_win_size {
                         out_frame0[chan_num*max_win_size+i] = out_temp0[i];
                     }
@@ -418,6 +429,8 @@ fn main() {
             };
         }).unwrap();
         
+        //out_data has enough slots for CHUNKS_IN_WRITE chunks of size max_win_size
+        //the write point points into the out_data at each chunk_point
         let write_point = (iter%CHUNKS_IN_WRITE)*max_win_size;
         
         for chan_num in 0..num_channels {
@@ -430,6 +443,7 @@ fn main() {
             }
         }
         
+        //when the iter is at the number of chunks to write, it will write the file to disk and reset the out_data
         if iter>0 && iter%CHUNKS_IN_WRITE==CHUNKS_IN_WRITE-1 {
             for samp in 0..max_win_size*CHUNKS_IN_WRITE {
                 for chan in 0..num_channels {
@@ -441,6 +455,7 @@ fn main() {
             }
         }
         
+        //the last chunk probably won't get to CHUNKS_IN_WRITE, so write it anyway
         if iter==chunk_points.len()-1 {
             for samp in 0..max_win_size*(iter%CHUNKS_IN_WRITE) {
                 for chan in 0..num_channels {
@@ -471,14 +486,19 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_frame:&[f64], filt_win: 
     let mut flipped_frame = vec![0.0; win_len];
     let mut spectrum_out = real_planner.plan_fft_forward(win_len).make_output_vec();
     
+    //the correlation values used
     let mut correlation = 0.0;
     let mut corr_temp = 0.0;
     let mut corr_abs;
     let mut c_a_temp = 0.0;
     let mut num_ffts = 1;
+
+    //sets up the ffts based on the extreme setting
     if extreme == 1 {num_ffts = 10}
     if extreme == 3 {num_ffts = 3}
     if extreme > 3 {num_ffts = extreme}
+
+    //goes through and makes all the ffts to compare correlation on
     for _count in 0..num_ffts {
         
         //0s the bins and randomizes the phases
@@ -503,6 +523,7 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_frame:&[f64], filt_win: 
         }
         corr_abs = corr_temp.abs();
         
+        //if the correlation is better use this one
         if corr_abs>c_a_temp {
             correlation = corr_temp;
             c_a_temp = correlation.abs();
@@ -511,7 +532,6 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_frame:&[f64], filt_win: 
     }
     corr_abs = correlation.abs();
     if correlation==0.0 {fin_out_frame = out_frame.clone()}
-    //if print {println!("correlation {}", correlation)}
     //inverts the randomized signal if the correlation is negative
     for i in 0..win_len {
         if correlation<0.0 {
@@ -521,45 +541,55 @@ fn process_microframe (spectrum:Vec<Complex<f64>>, last_frame:&[f64], filt_win: 
         }
     }
     
+    //gets the ness_window
     let ness_window = make_ness_window(win_len, corr_abs);
     
-    //returns a frame that contains the frame multiplied by the ness_window, the flipped frame (necessary for checking the next correlation), and then the value of the correlation (which is used in extreme algorithms 2 and 3) 
     let mut out_frame2 = vec![0.0; win_len];
     
-    //multiples the ness_window by the frame
+    //multiples the start of the ness_window by the start of the frame
+    //and the end of the ness_window by the end of the frame
     for i in 0..half_win_len {
         out_frame2[i] = flipped_frame[i] * ness_window[i] + (last_frame[i] * ness_window[i + half_win_len]);
     }
+    //add the second half of the flipped frame (no ness_window) to check for correlation on the next loop
     for i in 0..half_win_len {
         out_frame2[i+half_win_len] = flipped_frame[i+half_win_len];
     }
     
+    //returns a frame that contains the half win_len frame multiplied by the ness_window followed by the flipped frame (necessary for checking the next correlation)
+    
     return out_frame2;
 }
 
+//creates a chunk of audio that is the size of the max_win_size
 fn process_chunk(indata: &Vec<f64>, chunk_point: usize, win_len: usize, hop: f64, mut cut_offs: Vec<f64>, mut last_frame: Vec<f64>, chan_num: usize, mut extreme: usize, max_win_size: usize, out_frame_size: usize) -> Vec<f64> {
 
     let half_win_len = win_len/2;
     let in_win = make_paul_window(win_len);  //uses a paul window on the input
     
+    //the vector of stretch points contains the points where we will be reading from the indata
     let mut stretch_points = vec![0; (max_win_size/half_win_len) as usize];
     for iter in 0..stretch_points.len() {
         stretch_points[iter] = chunk_point+(hop * iter as f64) as usize + (max_win_size/2 - half_win_len) as usize;
     }
+
+    //the vector of out_points contains the points where we will be writing into the out_chunk buffer
     let mut out_points = vec![0; stretch_points.len()];
-    
     for iter in 0..out_points.len() {
         out_points[iter] = iter * half_win_len;
     }
     
+    //this is the audio we will be writing to disk plus the 4 extreme 2 last_frame vectors
+    //it will store the full audio chunk
     let mut out_chunk = vec![0.0; out_frame_size];
     
+    //this is the lookup location into the last_frame - since the last_frame contains "num_channels" locations with 4 half_win sized frames at each location
     let chan_point = chan_num*win_len*2;
     
     //big loop over the stretch points
     for big_iter in 0..stretch_points.len() {
         
-        //for efficiency, does the fft once for the 1-4 micro-slices of the algorithm
+        //for efficiency, does the fft once for the frame
         let mut real_planner = RealFftPlanner::<f64>::new();
         let fft = real_planner.plan_fft_forward(win_len);
         let mut spectrum = fft.make_output_vec();
@@ -569,8 +599,8 @@ fn process_chunk(indata: &Vec<f64>, chunk_point: usize, win_len: usize, hop: f64
         }
         fft.process(&mut part, &mut spectrum).unwrap();
         
+        //this reconfigures the number of ifft loops and arrangement of the cut_offs depending on the extreme algorithm setting
         let mut loops = 1;
-        
         match extreme {
             0 => {
                 cut_offs[1] = cut_offs[4];
@@ -592,13 +622,12 @@ fn process_chunk(indata: &Vec<f64>, chunk_point: usize, win_len: usize, hop: f64
             }   
         }
         
-        
-        //let last_frame_out = vec![0.0; win_len*2];
-        
+        //will loop once, twice, or 4 times depending on algorithm
         for i in 0..loops {
+            //makes the linquitz-riley window at the cuttoff points
             let filt_win = make_lr_bp_window(half_win_len+1, cut_offs[i], cut_offs[i+1], 64.0);
             let last_frame_slice = &last_frame[chan_point+i*half_win_len..chan_point+(i+1)*half_win_len];
-            //if big_iter==0 {println!("lfs {} {:?}", chan_num, &last_frame_slice[0..5])}
+            
             //process_microframe does the actual processing of the phase and returns the phase randomized frame
             let out_frame = process_microframe(spectrum.clone(), last_frame_slice, filt_win, extreme);
             
@@ -613,6 +642,8 @@ fn process_chunk(indata: &Vec<f64>, chunk_point: usize, win_len: usize, hop: f64
             }
         }
     };
+
+    //put the last frame output into the out_chunk at a point based on the channel being processed
     for i in 0..win_len*2 {
         out_chunk[max_win_size+i] = last_frame[chan_point+i];
     }
