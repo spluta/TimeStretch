@@ -1,1 +1,0 @@
-/Users/spluta1/Library/Application\ Support/SuperCollider/Extensions/TimeStretch/rust/time_stretch/target/debug/time_stretch: /Users/spluta1/Library/Application\ Support/SuperCollider/Extensions/TimeStretch/rust/time_stretch/src/main.rs
