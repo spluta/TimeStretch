@@ -67,7 +67,6 @@ TimeStretch2 {
 				outSig = HPF.ar(HPF.ar(outSig, (hiPass).clip(20, SampleRate.ir/2)), (hiPass).clip(20, SampleRate.ir/2));
 				outSig = LPF.ar(LPF.ar(outSig, (lowPass).clip(20, SampleRate.ir/2)), (lowPass).clip(20, SampleRate.ir/2));
 
-
 				Out.ar(out, Mix.new(outSig)*bigEnv*amp);
 
 				//Out.ar(out, [sig[0], sig[1], rVal, window0, window1])
@@ -75,6 +74,30 @@ TimeStretch2 {
 
 		}
 	}
+
+    *getFilterVals{|sampleRate, numSplits|
+        var filtVals;
+
+        if(sampleRate<50000){
+            filtVals = List.fill(8, {|i| 1/2**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
+        }{
+            filtVals = List.fill(8, {|i| 1/4**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
+        };
+        if(sampleRate>100000){
+            filtVals = List.fill(8, {|i| 1/8**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
+        };
+
+        if((numSplits)<9){ filtVals = filtVals.copyRange(9-numSplits, 8)};
+        filtVals.put(filtVals.size-1, [filtVals[filtVals.size-1][0], 1]);
+
+        filtVals[0].put(0, 0);
+
+        ^filtVals;
+    }
+
+    *getFFTVals{|filterVals, fftMax=65536|
+        ^List.fill(filterVals.size, {|i| fftMax/(2**(8-i))}).reverse
+    }
 
 	*stretch { |inFile, durMult, numSplits = 9, amp = 1, action|
 		var sf, argses, args, nrtJam, synthChoice, synths, numChans, server, buffer0, buffer1, filtVals, fftVals, fftBufs, headerFormat, outFile, fftMax = 65536;
@@ -96,21 +119,9 @@ TimeStretch2 {
 				.numInputBusChannels_(numChans)
 			);
 
-			if(sf.sampleRate<50000){
-				filtVals = List.fill(8, {|i| 1/2**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
-			}{
-				filtVals = List.fill(8, {|i| 1/4**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
-			};
-			if(sf.sampleRate>100000){
-				filtVals = List.fill(8, {|i| 1/8**(i+1)}).dup.flatten.add(0).add(1).sort.clump(2);
-			};
+            filtVals = this.getFilterVals(sf.sampleRate, numSplits);
 
-			if((numSplits)<9){ filtVals = filtVals.copyRange(9-numSplits, 8)};
-			filtVals.put(filtVals.size-1, [filtVals[filtVals.size-1][0], 1]);
-
-			filtVals[0].put(0, 0);
-
-			fftVals = List.fill(filtVals.size, {|i| fftMax/(2**(8-i))}).reverse;
+			fftVals = this.getFFTVals(filtVals);
 
 			filtVals.postln;
 			fftVals.postln;
@@ -156,12 +167,7 @@ TimeStretch2 {
 		^nrtJam
 	}
 
-
-
-
 }
-
-
 
 // TimeStretch2 {
 // 	classvar synths;
