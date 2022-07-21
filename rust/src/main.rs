@@ -22,27 +22,27 @@ fn main() {
     .about("NessStretch Time Stretching Algorithm")
     .arg(
         Arg::with_name("file")
-        .short("f")
+        .short('f')
         .long("file")
         .takes_value(true)
         .help("An audio file you want to stretch. Must be a wav file. Can be of any bit depth, up to 32 bit float."),
     )
     .arg(
         Arg::with_name("mult")
-        .short("m")
+        .short('m')
         .long("dur_mult")
         .takes_value(true)
         .help("The duration multiplier. eg: 100 is a 100x stretch. dur_mults under 1 might work...and they might not"),
     ).arg(
         Arg::with_name("out")
-        .short("o")
+        .short('o')
         .long("out_file")
         .takes_value(true)
         .help("The name of the output file (optional - will name the file with the inputname_mult.wav"),
     )
     .arg(
         Arg::with_name("slices")
-        .short("s")
+        .short('s')
         .long("num_slices")
         .takes_value(true)
         .help("The number of slices of the spectrum (optional - default is 9 - 4 or 5 is nice for transients/perc).
@@ -51,7 +51,7 @@ fn main() {
     )
     .arg(
         Arg::with_name("extreme")
-        .short("e")
+        .short('e')
         .long("extreme")
         .takes_value(true)
         .help("In addition to the standard NessStretch (default 0), there are 3+ extreme modes (more cpu) set by this flag. 
@@ -59,6 +59,20 @@ fn main() {
         2 - breaks the (9) spectral slices into 4 more slices, and correlates those independently
         3 - both 1 and 2, with the spectra split into 2 extra slices and 3 versions of each frame compared for correlation
         4+ - like extreme 1, except the number assigned is the number of versions of each frame made (-e 5 makes 5 versions of each frame)"
+    ))
+    .arg(
+        Arg::with_name("verbosity")
+        .short('v')
+        .long("verbosity")
+        .takes_value(true)
+        .help("Default is 1 - verbose. Setting to 0 disables posting to screen."
+    ))
+    .arg(
+        Arg::with_name("cut_fades")
+        .short('c')
+        .long("cut_fades")
+        .takes_value(true)
+        .help("Default is 0 - no cut. Setting to 1 cuts the fade in and fade out material, shortening the output."
     ))
     .get_matches();
     
@@ -68,7 +82,6 @@ fn main() {
         println!("No file name provided. Run 'ness_stretch -h' for help.");
         return;
     }
-    println!("The input file is: {}", file_name);
     
     let dm_in = matches.value_of("mult").unwrap_or("100.0");
     let dur_mult: f64 = match dm_in.parse() {
@@ -88,7 +101,6 @@ fn main() {
         }
     };
     if extreme > 3 {extreme = 0};
-    println!("Extreme setting set to: {}", extreme);
     
     let s_in = matches.value_of("slices").unwrap_or("9");
     let mut num_slices: usize = match s_in.parse() {
@@ -98,15 +110,37 @@ fn main() {
             return;
         }
     };
+
+    let s_in = matches.value_of("verbosity").unwrap_or("1");
+    let verbosity: usize = match s_in.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            eprintln!("error: verbosity argument not an integer");
+            return;
+        }
+    };
+
+    let s_in = matches.value_of("cut_fades").unwrap_or("0");
+    let cut_fades: usize = match s_in.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            eprintln!("error: cut_fades argument not an integer");
+            return;
+        }
+    };
     
     let temp_out_file = file_name.replace(".wav", &format!("{}{}{}", "_", dur_mult, ".wav"));
     let out_file = matches.value_of("out").unwrap_or(&temp_out_file);
-    println!("The output file will be: {}", out_file);
-    println!("");
-    println!("If your output file exceeds the limitations of the WAV format, the OS will think the file is too short, but all of the data will be there and it will be readable with software like Reaper (by normal import) or Audacity (via import Raw Data)");
-    
-    println!("");
-    println!("Will process an audio file of any channel count in parallel.");
+    if verbosity == 1 {
+        println!("The input file is: {}", file_name);
+        println!("Extreme setting set to: {}", extreme);
+        println!("The output file will be: {}", out_file);
+        println!("");
+        println!("If your output file exceeds the limitations of the WAV format, the OS will think the file is too short, but all of the data will be there and it will be readable with software like Reaper (by normal import) or Audacity (via import Raw Data)");
+
+        println!("");
+        println!("Will process an audio file of any channel count in parallel.");
+    }
     
     //reading the sound file using hound
     //only works with wav files - would be great to replace this with something that works with other formats
@@ -151,7 +185,9 @@ fn main() {
     //[processed audio(max_win_size)][last_frame1][last_frame2][last_frame3][last_frame4] (for the 4 possible subslices of the slice)
     let out_frame_size:usize = max_win_size*3;  
     
-    println!("Max Window Size: {}", max_win_size);
+    if verbosity == 1 {
+        println!("Max Window Size: {}", max_win_size);
+    }
     
     //chunks the interleved file into chunks of size channels
     //then transposes the interleaved file into individual vectors for each channel
@@ -176,7 +212,9 @@ fn main() {
     } else if sample_rate>=88200 && num_slices>9 {
         num_slices = MAX_SLICES;
     }
-    println!("The audio file will be sliced into {} slices", num_slices);
+    if verbosity == 1 {
+        println!("The audio file will be sliced into {} slices", num_slices);
+    }
 
     //pushes the win_lens into the vector
     //256 is always the smallest win_lens, 131072 always the largest (the extras just don't get used)
@@ -201,8 +239,10 @@ fn main() {
     
     //right here just replace the calculated values with the csv values
     
-    println!("window sizes {:?}", &win_lens[0..num_slices]);
-    println!("spectral cut offs {:?}", cut_offs);
+    if verbosity == 1 {
+        println!("window sizes {:?}", &win_lens[0..num_slices]);
+        println!("spectral cut offs {:?}", cut_offs);
+    }
     
     let num_channels = channels.len();
     
@@ -266,18 +306,6 @@ fn main() {
     let mut out_temp8 = vec![0.0; out_frame_size];
     let mut out_temp9 = vec![0.0; out_frame_size];
     
-    //holds
-    let mut out_frame0 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame1 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame2 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame3 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame4 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame5 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame6 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame7 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame8 = vec![0.0; out_frame_size*num_channels];
-    let mut out_frame9 = vec![0.0; out_frame_size*num_channels];
-    
     
     //hound is the wav reader and writer
     let spec = hound::WavSpec {
@@ -288,13 +316,39 @@ fn main() {
     };
     
     let mut writer = hound::WavWriter::create(out_file, spec).unwrap();
-    
+
+    let mut write_iter: i32 = -1;
+
+    let mut start_iter = 0;
+
+    if cut_fades != 0 {
+        start_iter = (dur_mult / 2.0).ceil() as usize - 1;
+        write_iter = -2;
+    };
+
     //go through the chunk_points, making max_win_size chunks of audio
     for iter in 0..chunk_points.len() {
-        if iter%25 == 0 {println!("chunk {} of {}", iter, chunk_points.len())}
+        //holds
+        let mut out_frame0 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame1 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame2 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame3 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame4 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame5 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame6 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame7 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame8 = vec![0.0; out_frame_size * num_channels];
+        let mut out_frame9 = vec![0.0; out_frame_size * num_channels];
 
         let chunk_point = chunk_points[iter];
-        
+
+        if iter >= start_iter && (iter < (chunk_points.len() - start_iter)) {
+            //println!("{:?}", iter);
+            write_iter += 1;
+
+            if iter % 25 == 0 && verbosity == 1 {
+                println!("chunk {} of {}", iter, chunk_points.len())
+            }
         //super ugly, but as far as I know, this is the only way to access a multidimensional vector
         thread::scope(|s| {
             s.spawn(|_| {
@@ -432,49 +486,58 @@ fn main() {
                 });
             };
         }).unwrap();
+    }
         
         //out_data has enough slots for CHUNKS_IN_WRITE chunks of size max_win_size
         //the write point points into the out_data at each chunk_point
-        let write_point = (iter%CHUNKS_IN_WRITE)*max_win_size;
-        
-        for chan_num in 0..num_channels {
-            let read_point = chan_num*max_win_size;
-            for i in 0..max_win_size {
-                out_data[chan_num][write_point+i] = 
-                out_frame0[read_point+i]+out_frame1[read_point+i]+out_frame2[read_point+i]+out_frame3[read_point+i]
-                +out_frame4[read_point+i]+out_frame5[read_point+i]+out_frame6[read_point+i]+out_frame7[read_point+i]
-                +out_frame8[read_point+i]+out_frame9[read_point+i];
-            }
-        }
-        
-        //when the iter is at the number of chunks to write, it will write the file to disk and reset the out_data
-        if iter>0 && iter%CHUNKS_IN_WRITE==CHUNKS_IN_WRITE-1 {
-            for samp in 0..max_win_size*CHUNKS_IN_WRITE {
-                for chan in 0..num_channels {
-                    writer
-                    .write_sample(out_data[chan][samp] as f32)
-                    .unwrap();
-                    out_data[chan][samp] = 0.0;
+        if write_iter >= 0 {
+            let write_point = (write_iter as usize % CHUNKS_IN_WRITE) * max_win_size;
+
+            for chan_num in 0..num_channels {
+                let read_point = chan_num * max_win_size;
+                for i in 0..max_win_size {
+                    out_data[chan_num][write_point + i] = out_frame0[read_point + i]
+                        + out_frame1[read_point + i]
+                        + out_frame2[read_point + i]
+                        + out_frame3[read_point + i]
+                        + out_frame4[read_point + i]
+                        + out_frame5[read_point + i]
+                        + out_frame6[read_point + i]
+                        + out_frame7[read_point + i]
+                        + out_frame8[read_point + i]
+                        + out_frame9[read_point + i];
                 }
             }
-        }
-        
-        //the last chunk probably won't get to CHUNKS_IN_WRITE, so write it anyway
-        if iter==chunk_points.len()-1 {
-            for samp in 0..max_win_size*(iter%CHUNKS_IN_WRITE) {
-                for chan in 0..num_channels {
-                    writer
-                    .write_sample(out_data[chan][samp] as f32)
-                    .unwrap();
+
+            //need to fix this to start at the cut_fades point
+            //when the iter reaches the number of chunks to write (500 chunks - a long time), it will write the data to disk, reset the out_data
+            //and continue stretching the rest of the input
+            if write_iter > 0 && write_iter as usize % CHUNKS_IN_WRITE == CHUNKS_IN_WRITE - 1 {
+                for samp in 0..(max_win_size * CHUNKS_IN_WRITE) {
+                    (0..channels.len()).for_each(|chan| {
+                        writer.write_sample(out_data[chan][samp] as f32).unwrap();
+                        out_data[chan][samp] = 0.0;
+                    });
                 }
-            }
+            } else if iter == chunk_points.len() - 1 {
+                //if the audio file is short, it will never trigger the above
+                //the last chunk probably won't get to CHUNKS_IN_WRITE, so write it anyway
+
+                (0..max_win_size * (write_iter as usize % CHUNKS_IN_WRITE)).for_each(|samp| {
+                    for chan in 0..num_channels {
+                        writer.write_sample(out_data[chan][samp] as f32).unwrap();
+                    }
+                });
+            };
         }
         
     }
     
     //close the output file
     writer.finalize().unwrap();
-    println!("{:?}", now.elapsed());
+    if verbosity == 1 {
+        println!("{:?}", now.elapsed())
+    };
 }
 //this is the code that does the actual randomizing of phases
 fn process_microframe (spectrum:Vec<Complex<f64>>, last_frame:&[f64], filt_win: Vec<f64>, extreme: usize) -> Vec<f64> {
