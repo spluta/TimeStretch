@@ -1,10 +1,10 @@
 [package]
 name = "ness_stretch"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Sam Pluta <spluta@gmail.com>", "Alex Ness <asness@gmail.com>"]
 edition = "2018"
 license = "GPL-3.0"
-keywords = ["audio", "rustfft"]
+keywords = ["audio", "rustfft", "time stretch"]
 categories = ["multimedia::audio", "multimedia"]
 repository = "https://github.com/spluta/TimeStretch"
 readme = "README.md"
@@ -14,7 +14,7 @@ description = "Implements a phase randomized Real FFT time stretch algorithm, th
 [dependencies]
 
 rustfft = "6.0.1"
-realfft = "2.0.1"
+realfft = "3.0.0"
 rand="0.8.0"
 hound = "3.4.0"
 chrono = "0.4"

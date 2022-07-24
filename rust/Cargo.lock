@@ -240,7 +240,7 @@ checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
 
 [[package]]
 name = "ness_stretch"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "bwavfile",
  "chrono",
@@ -343,9 +343,9 @@ dependencies = [
 
 [[package]]
 name = "realfft"
-version = "2.0.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7695c87f31dc3644760f23fb59a3fed47659703abf76cf2d111f03b9e712342"
+checksum = "a83b876fe55da7e1bf5deeacb93d6411edf81eba0e1a497e79c067734729053a"
 dependencies = [
  "rustfft",
 ]
