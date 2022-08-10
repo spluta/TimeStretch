@@ -74,6 +74,13 @@ fn main() {
         .takes_value(true)
         .help("Default is 0 - no cut. Setting to 1 cuts the fade in and fade out material, shortening the output."
     ))
+    .arg(
+        Arg::with_name("filter_on")
+        .short('g')
+        .long("filter_on")
+        .takes_value(true)
+        .help("Default is 1 - each window will be filtered. Setting to 0 assumes the input has been pre-filtered into bands."
+    ))
     .get_matches();
 
     let file_name = matches.value_of("file").unwrap_or("");
@@ -123,6 +130,15 @@ fn main() {
 
     let s_in = matches.value_of("cut_fades").unwrap_or("0");
     let cut_fades: usize = match s_in.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            eprintln!("error: cut_fades argument not an integer");
+            return;
+        }
+    };
+
+    let s_in = matches.value_of("filter_on").unwrap_or("1");
+    let filter_on: usize = match s_in.parse() {
         Ok(n) => n,
         Err(_) => {
             eprintln!("error: cut_fades argument not an integer");
@@ -363,6 +379,44 @@ fn main() {
                 println!("chunk {} of {}", iter, chunk_points.len())
             }
             
+            if num_slices == 1 {
+
+                for chan_num in 0..num_channels {
+                thread::scope(|s| {
+                    s.spawn(|_| {
+                            //out_temp will be the chunk of audio to write, then 4 "last_frames", one for each of the possible subslices
+                            out_temp0 = process_chunk(
+                                &indata[chan_num],
+                                chunk_point,
+                                win_lens[0],
+                                filter_on,
+                                hops[0],
+                                cut_offs[0].clone(),
+                                last_frame0.clone(),
+                                chan_num,
+                                extreme,
+                                max_win_size,
+                                out_frame_size,
+                            );
+    
+                            //put the last_frame data back into the last frame so it is there when we loop around to the next chunk
+                            for i in 0..(win_lens[0] * 2) {
+                                last_frame0[chan_num * win_lens[0] * 2 + i] =
+                                    out_temp0[max_win_size + i];
+                            }
+                            //grab the out_frame from the out_temp
+                            //the out_frame is a flat array with spaces for all channels of output audio
+                            //it is stored [channel0][channel1]..etc, but is flat
+                            for i in 0..max_win_size {
+                                out_frame0[chan_num * max_win_size + i] = out_temp0[i];
+                            }
+                        
+                    });
+                });
+            };
+
+            } else {
+
             //super ugly, but as far as I know, this is the only way to access a multidimensional vector
             thread::scope(|s| {
                 s.spawn(|_| {
@@ -372,6 +426,7 @@ fn main() {
                             &indata[chan_num],
                             chunk_point,
                             win_lens[0],
+                            filter_on,
                             hops[0],
                             cut_offs[0].clone(),
                             last_frame0.clone(),
@@ -401,6 +456,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[1],
+                                filter_on,
                                 hops[1],
                                 cut_offs[1].clone(),
                                 last_frame1.clone(),
@@ -426,6 +482,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[2],
+                                filter_on,
                                 hops[2],
                                 cut_offs[2].clone(),
                                 last_frame2.clone(),
@@ -451,6 +508,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[3],
+                                filter_on,
                                 hops[3],
                                 cut_offs[3].clone(),
                                 last_frame3.clone(),
@@ -476,6 +534,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[4],
+                                filter_on,
                                 hops[4],
                                 cut_offs[4].clone(),
                                 last_frame4.clone(),
@@ -501,6 +560,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[5],
+                                filter_on,
                                 hops[5],
                                 cut_offs[5].clone(),
                                 last_frame5.clone(),
@@ -526,6 +586,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[6],
+                                filter_on,
                                 hops[6],
                                 cut_offs[6].clone(),
                                 last_frame6.clone(),
@@ -551,6 +612,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[7],
+                                filter_on,
                                 hops[7],
                                 cut_offs[7].clone(),
                                 last_frame7.clone(),
@@ -576,6 +638,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[8],
+                                filter_on,
                                 hops[8],
                                 cut_offs[8].clone(),
                                 last_frame8.clone(),
@@ -601,6 +664,7 @@ fn main() {
                                 &indata[chan_num],
                                 chunk_point,
                                 win_lens[9],
+                                filter_on,
                                 hops[9],
                                 cut_offs[9].clone(),
                                 last_frame9.clone(),
@@ -621,6 +685,7 @@ fn main() {
                 };
             })
             .unwrap();
+        }
         }
 
         //out_data has enough slots for CHUNKS_IN_WRITE chunks of size max_win_size
@@ -678,6 +743,7 @@ fn process_microframe(
     spectrum: Vec<Complex<f64>>,
     last_frame: &[f64],
     filt_win: Vec<f64>,
+    filter_on: usize,
     extreme: usize,
 ) -> Vec<f64> {
     let half_win_len = spectrum.len() - 1;
@@ -715,7 +781,7 @@ fn process_microframe(
         for iter in 1..spectrum.len()-1 {
 
             let mut temp = spectrum[iter].to_polar();
-            temp.0 = temp.0 * filt_win[iter];
+            if filter_on == 1 {temp.0 = temp.0 * filt_win[iter]};
             temp.1 = rand::thread_rng().gen_range(-PI/2.0..PI/2.0);
             spectrum_out[iter] = Complex::from_polar(temp.0, temp.1);
         }
@@ -790,6 +856,7 @@ fn process_chunk(
     indata: &Vec<f64>,
     chunk_point: usize,
     win_len: usize,
+    filter_on: usize,
     hop: f64,
     mut cut_offs: Vec<f64>,
     mut last_frame: Vec<f64>,
@@ -867,7 +934,7 @@ fn process_chunk(
 
             //process_microframe does the actual processing of the phase and returns the phase randomized frame
             let out_frame =
-                process_microframe(spectrum.clone(), last_frame_slice, filt_win, extreme);
+                process_microframe(spectrum.clone(), last_frame_slice, filt_win, filter_on, extreme);
 
             //get the current frame to return as the last
             for i2 in 0..half_win_len {
