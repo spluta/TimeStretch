@@ -13,7 +13,7 @@ description = "Implements a phase randomized Real FFT time stretch algorithm, th
 
 [dependencies]
 
-rustfft = "6.0.1"
+rustfft = "6.1"
 realfft = "3.0.0"
 rand="0.8.0"
 hound = "3.4.0"

@@ -323,6 +323,11 @@ fn main() {
     let mut last_frame8 = vec![0.0; win_lens[8] * 2 * num_channels];
     let mut last_frame9 = vec![0.0; win_lens[9] * 2 * num_channels];
 
+    // let mut l_fs = [vec![0.0; 100]; 18];
+    // for iter in 0..18 {
+    //     l_fs[iter] = vec![0.0; win_lens[iter%9] * 2 * num_channels];
+    // }
+
     //used for the output of process_chunk
     //holds the 1)full output chunk 2)four last_frames for extreme stretch
     let mut out_temp0 = vec![0.0; out_frame_size];
@@ -381,18 +386,23 @@ fn main() {
             
             if num_slices == 1 {
 
-                for chan_num in 0..num_channels {
-                thread::scope(|s| {
-                    s.spawn(|_| {
-                            //out_temp will be the chunk of audio to write, then 4 "last_frames", one for each of the possible subslices
+                
+               // thread::scope(|s| {
+                    for chan_num in 0..num_channels {
+                    //s.spawn(move |_| {
+                        //println!("single frame size");  
+                        
+                        let win_len = win_lens[5];
+                        
+                        //out_temp will be the chunk of audio to write, then 4 "last_frames", one for each of the possible subslices
                             out_temp0 = process_chunk(
                                 &indata[chan_num],
                                 chunk_point,
-                                win_lens[0],
+                                win_len,
                                 filter_on,
-                                hops[0],
+                                hops[5],
                                 cut_offs[0].clone(),
-                                last_frame0.clone(),
+                                last_frame5.clone(),
                                 chan_num,
                                 extreme,
                                 max_win_size,
@@ -400,20 +410,20 @@ fn main() {
                             );
     
                             //put the last_frame data back into the last frame so it is there when we loop around to the next chunk
-                            for i in 0..(win_lens[0] * 2) {
-                                last_frame0[chan_num * win_lens[0] * 2 + i] =
-                                    out_temp0[max_win_size + i];
+                            for i in 0..(win_len * 2) {
+                                last_frame5[chan_num * win_len * 2 + i] =
+                                    out_temp5[max_win_size + i];
                             }
                             //grab the out_frame from the out_temp
                             //the out_frame is a flat array with spaces for all channels of output audio
                             //it is stored [channel0][channel1]..etc, but is flat
                             for i in 0..max_win_size {
-                                out_frame0[chan_num * max_win_size + i] = out_temp0[i];
+                                out_frame5[chan_num * max_win_size + i] = out_temp5[i];
                             }
                         
-                    });
-                });
-            };
+                    //});
+                };
+                //}).unwrap();
 
             } else {
 
