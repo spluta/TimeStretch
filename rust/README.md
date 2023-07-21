@@ -26,7 +26,7 @@ See the [ICMC paper](https://github.com/spluta/TimeStretch/blob/main/NessStretch
 
 For an optimized version of the NessStretch, use the command-line Rust version, which can be installed in a couple of different ways:
 
-1) via homebrew (mac only), by running:
+1) via homebrew (mac with apple silicon only), by running:
 
 ```
 brew tap spluta/ness_stretch
@@ -44,8 +44,8 @@ for the help.
 cargo install ness_stretch
 ```
 
-Linux and Windows builds (untested auto builds using GitHub actions) are found here:
+Mac x86, Linux and Windows builds (untested auto builds using GitHub actions) are found here:
 
-https://github.com/spluta/ness_stretch/actions/runs/1087257841
+https://github.com/spluta/ness_stretch/releases/tag/0.2.3
 
-Or download the Rust source and compile using cargo. The rust version will be very fast on Intel Macs and very slow on Arm machines (until rustfft gets updated).
+Or download the Rust source and compile using cargo.
