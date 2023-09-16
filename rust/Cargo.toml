@@ -11,14 +11,9 @@ readme = "README.md"
 description = "Implements a phase randomized Real FFT time stretch algorithm, the NessStretch, which splits the original sound file into 1-10 discrete frequency bands, and uses a decreasing frame size to correspond to increasing frequency, thus doing a excellent job of resolving shorter, noisier high-frequency sounds and creating rich, lush low frequency pads."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
 
-rustfft = "6.1"
-realfft = "3.0.0"
-rand="0.8.0"
-hound = "3.4.0"
-chrono = "0.4"
+[dependencies]
+# ness_stretch_lib = {version = "0.1.2"}
+ness_stretch_lib = "0.1.2"
 clap = { version = "4.3.17", features = ["derive"] }
-bwavfile = "2.0.1"
-crossbeam-utils = "0.8.7"
-klask = "1.0.0"
+
