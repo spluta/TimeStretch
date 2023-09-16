@@ -9,7 +9,7 @@ use ness_stretch_lib::process_file;
 #[derive(Parser)]
 #[command(name = "ness_stretch")]
 #[command(author = "Sam Pluta and Alex Ness")]
-#[command(version = "0.5.1")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "NessStretch Time Stretching Algorithm", long_about = "Time stretches a wav file (wav only) using the NessStretch time stretching algorith. Works with files of any duration, though things will get weird with files less than 65536 samples. Can time stretch to any duration your computer can handle!")]
 //Sam Pluta and Alex Ness
 struct Cli {
