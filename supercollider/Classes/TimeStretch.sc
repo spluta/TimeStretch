@@ -314,8 +314,10 @@ TimeStretch {
 		if(chanArray==nil){chanArray = Array.fill(SoundFile.openRead(inFile).numChannels, {|i| i})};
 
 		chanArray.do{|chanNum, i2|
-			TimeStretch.mkStretchTemp(fileName++"_"++chanNum++".scd", inFile, durMult, chanNum, splits, filterOrder, fftType);
-			AppClock.sched((1), {("sclang "++fileName++"_"++chanNum++".scd").postln.runInTerminal});
+			var scdPath = fileName ++ "_" ++ chanNum ++ ".scd";
+			var escapedScdPath = thisProcess.platform.formatPathForCmdLine(scdPath);
+			TimeStretch.mkStretchTemp(scdPath, inFile, durMult, chanNum, splits, filterOrder, fftType);
+			AppClock.sched(1) { ("sclang " ++ escapedScdPath).postln.runInTerminal };
 		}
 	}
 
