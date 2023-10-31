@@ -315,7 +315,7 @@ TimeStretch {
 
 		chanArray.do{|chanNum, i2|
 			TimeStretch.mkStretchTemp(fileName++"_"++chanNum++".scd", inFile, durMult, chanNum, splits, filterOrder, fftType);
-			AppClock.sched((1), {("sclang "++fileName++"_"++chanNum++".scd").postln.runInTerminal});
+            AppClock.sched((1), {("sclang "++fileName++"_"++chanNum++".scd").postln.unixCmd});
 		}
 	}
 
